@@ -18,9 +18,9 @@ connection()
     console.error("DATABASE CONNECTION FAILED:", e);
   });
 
-// Schedule the task to run every minute for testing
+
 console.log("Setting up cron job...");
-cron.schedule("* * * * *", async () => {
+cron.schedule("*/30 * * * *", async () => {
   const now = new Date().toISOString();
   console.log(`Cron job triggered at ${now}`);
   try {
@@ -34,6 +34,7 @@ cron.schedule("* * * * *", async () => {
 }, {
   timezone: "UTC" // Explicitly set timezone to avoid discrepancies
 });
+
 
 // Optional: Uncomment to revert to daily midnight schedule after testing
 /*

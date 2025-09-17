@@ -27,8 +27,8 @@ const sidebarConfig = [
     section: "Main",
     items: [
       { icon: <Home />, label: "Home", href: "/", badge: null },
-      { icon: <MessageSquare />, label: "Discussions", href: "/discussions", badge: 3 },
-      { icon: <FileText />, label: "Announcements", href: "/announcements", badge: 1 },
+      { icon: <MessageSquare />, label: "Discussions", href: "/discussions"},
+      { icon: <FileText />, label: "Announcements", href: "/announcements"},
     ],
   },
   {
