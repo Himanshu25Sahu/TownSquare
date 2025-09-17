@@ -25,11 +25,11 @@ app.use(
 const isProduction = process.env.NODE_ENV === "production";
 // console.log("#############################",isProduction);
 // Add this temporary middleware before your routes
-app.use((req, res, next) => {
-  console.log('Incoming cookies:', req.cookies);
-  console.log('Incoming headers:', req.headers);
-  next();
-});
+// app.use((req, res, next) => {
+//   console.log('Incoming cookies:', req.cookies);
+//   console.log('Incoming headers:', req.headers);
+//   next();
+// });
 app.use(session({
   secret: process.env.SESSION_SECRET, // move to .env ideally
   resave: false,
@@ -44,6 +44,9 @@ app.set("trust proxy", 1);
 
 app.get("/", (req, res) => {
   res.send("Hello World");
+});
+app.get("/health", (req, res) => {
+  res.send("Server is up and running!");
 });
 app.use("/user", userRouter);
 app.use('/post',postRouter);
