@@ -30,7 +30,7 @@ import {
   HiOutlineArrowRight,
 } from "react-icons/hi";
 import { HiMegaphone } from "react-icons/hi2";
-// import "./CreatePost.css";
+import "./CreatePost.css";
 import { useSelector } from "react-redux";
 
 const MAX_UPLOADS = 3;

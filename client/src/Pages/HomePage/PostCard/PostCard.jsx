@@ -4,7 +4,7 @@ import { getTimeAgo, formatDate } from "../Helpers";
 import { ImageCarousel } from "../ImageCarousel";
 import axios from "axios";
 import { toast } from "react-toastify";
-// import "./PostCard.css";
+import "./PostCard.css";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASEURL;
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_BASEURL;

@@ -2,8 +2,8 @@
 import { useState, useEffect, createContext, useContext } from "react"
 import { UserProfileContent } from "./UserProfileContent.jsx"
 import { CheckCircle, X, AlertTriangle, Bell } from "lucide-react"
-// import "./UserProfile.css"
-// import "./EditProfile.css"
+import "./UserProfile.css"
+import "./EditProfile.css"
 
 // Toast Context
 const ToastContext = createContext(null)

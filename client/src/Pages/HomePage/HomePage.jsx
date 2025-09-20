@@ -3,7 +3,7 @@ import axios from "axios";
 import { useTheme } from "../../components/ThemeProvider";
 import ThemeToggle from "../../components/ThemeToggle";
 import { useSelector } from "react-redux";
-// import "./HomePage.css";
+import "./HomePage.css";
 import { throttle } from 'lodash';
 import "react-toastify/dist/ReactToastify.css";
 import { getTimeAgo, formatDate } from "./Helpers";

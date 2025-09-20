@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
-// import "./AnnouncementsPage.css";
+import "./AnnouncementsPage.css";
 import { fetchAnnouncements } from "../../Apis/postApi.jsx";
 import {
   FiBell,

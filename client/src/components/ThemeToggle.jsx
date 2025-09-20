@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useTheme } from "./ThemeProvider"
-// import "./ThemeToggle.css"
+import "./ThemeToggle.css"
 import { Sun, Moon, Stars } from "lucide-react"
 
 function ThemeToggle() {

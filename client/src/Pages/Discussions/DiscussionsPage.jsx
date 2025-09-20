@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-// import "./DiscussionsPage.css";
+import "./DiscussionsPage.css";
 import { useSelector } from "react-redux";
 import { formatDate } from "../utils/formatDate.jsx";
 import { renderIcon } from "../utils/renderIcon.jsx";
