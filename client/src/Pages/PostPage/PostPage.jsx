@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useTheme } from "../../components/ThemeProvider";
-import "./PostPage.css";
+// import "./PostPage.css";
 import { Vote, Send, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSelector } from "react-redux";
 import { toast } from "react-hot-toast";

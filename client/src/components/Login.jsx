@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { FiEye, FiEyeOff, FiEdit2, FiCheck, FiMail, FiLock, FiUser, FiPhone, FiMapPin, FiHome } from "react-icons/fi";
-import "./Login.css";
+// import "./Login.css";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { login, signup } from "../Slices/AuthSlice.js";

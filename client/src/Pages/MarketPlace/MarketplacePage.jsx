@@ -28,7 +28,7 @@ import {
   ThumbsUp,
   HelpCircle,
 } from "lucide-react";
-import "./MarketplacePage.css";
+// import "./MarketplacePage.css";
 
 // Custom Hook for fetching marketplace items
 const useMarketplaceItems = (token) => {

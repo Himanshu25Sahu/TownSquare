@@ -1,0 +1,82 @@
+.tech-stack {
+  background: #0a0a0a;
+}
+
+.tech-subtitle {
+  text-align: center;
+  color: #a1a1aa;
+  font-size: 1.1rem;
+  margin-bottom: 60px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 30px;
+  margin-top: 60px;
+}
+
+.tech-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  transition: all 0.4s ease;
+  opacity: 0;
+  transform: translateY(30px) rotateX(15deg);
+  backdrop-filter: blur(10px);
+}
+
+.tech-item.visible {
+  opacity: 1;
+  transform: translateY(0) rotateX(0deg);
+}
+
+.tech-item:hover {
+  transform: translateY(-10px) rotateX(-5deg);
+  border-color: var(--tech-color);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tech-icon {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.tech-item:hover .tech-icon {
+  transform: scale(1.2) rotate(5deg);
+}
+
+.tech-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #ffffff;
+  transition: color 0.3s ease;
+}
+
+.tech-item:hover .tech-name {
+  color: var(--tech-color);
+}
+
+@media (max-width: 768px) {
+  .tech-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .tech-item {
+    padding: 30px 15px;
+  }
+
+  .tech-icon {
+    font-size: 2.5rem;
+  }
+}
