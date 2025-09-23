@@ -92,11 +92,9 @@ function HomePage() {
           return;
         }
 
-        // Construct type query parameter based on activeTab
-        const typeParam = activeTab === "all" ? "" : activeTab === "events" ? "announcements" : activeTab;
+// Fetch paginated posts without type filter
+const response = await api.get(`/post/getFeed?page=${currentPage}&limit=${postsPerPage}`);
 
-        // Fetch paginated posts with type filter
-        const response = await api.get(`/post/getFeed?page=${currentPage}&limit=${postsPerPage}${typeParam ? `&type=${typeParam}` : ""}`);
 
         if (response.data) {
           setPageData(prev => ({
@@ -176,7 +174,24 @@ function HomePage() {
   }, []);
 
   // Remove client-side filtering since it's handled by the backend
-  const paginatedPosts = pageData.posts; // Use posts directly from API response
+  // Client-side filtering for the current page's posts
+const paginatedPosts = useMemo(() => {
+  const typeMap = {
+    all: "",
+    marketplace: "marketplace",
+    polls: "poll",
+    announcements: "general",
+    issues: "issue",
+    survey: "survey"
+  };
+  const filterType = typeMap[activeTab];
+  return filterType
+    ? pageData.posts.filter(post => post.type && post.type.toLowerCase() === filterType.toLowerCase())
+    : pageData.posts;
+}, [activeTab, pageData.posts]);
+
+// Update totalPosts for filtered posts
+
 
   // Calculate total pages
   const totalPages = Math.ceil(totalPosts / postsPerPage);
@@ -370,6 +385,16 @@ function HomePage() {
       .ts-action-button.active {
         color: var(--primary-color);
       }
+        .ts-quick-link.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 0.5rem;
+}
+
+.dark .ts-quick-link.active {
+  background-color: var(--primary-color);
+  color: white;
+}
 
       /* Pagination Styles */
       .ts-pagination {
@@ -502,7 +527,7 @@ function HomePage() {
             {/* Quick Links */}
             <div className="ts-quick-links">
               <div
-                className="ts-quick-link"
+                className={`ts-quick-link ${activeTab === "all" ? "active" : ""}`}
                 onClick={() => setActiveTab("all")}
                 id="quick-link-all"
               >
@@ -525,7 +550,7 @@ function HomePage() {
                 <span>All</span>
               </div>
               <div
-                className="ts-quick-link"
+                className={`ts-quick-link ${activeTab === "marketplace" ? "active" : ""}`}
                 onClick={() => setActiveTab("marketplace")}
                 id="quick-link-marketplace"
               >
@@ -549,7 +574,7 @@ function HomePage() {
                 <span>Marketplace</span>
               </div>
               <div
-                className="ts-quick-link"
+               className={`ts-quick-link ${activeTab === "polls" ? "active" : ""}`}
                 onClick={() => setActiveTab("polls")}
                 id="quick-link-polls"
               >
@@ -573,7 +598,7 @@ function HomePage() {
                 <span>Polls</span>
               </div>
               <div
-                className="ts-quick-link"
+                className={`ts-quick-link ${activeTab === "announcements" ? "active" : ""}`}
                 onClick={() => setActiveTab("announcements")}
                 id="quick-link-announcements"
               >
@@ -596,7 +621,7 @@ function HomePage() {
                 <span>Announcements</span>
               </div>
               <div
-                className="ts-quick-link"
+                className={`ts-quick-link ${activeTab === "issues" ? "active" : ""}`}
                 onClick={() => setActiveTab("issues")}
                 id="quick-link-issues"
               >
