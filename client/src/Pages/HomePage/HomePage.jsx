@@ -11,7 +11,7 @@ const HeroCarousel = lazy(() => import("./HeroCarousel").then(module => ({ defau
 const PostCard = lazy(() => import("./PostCard/PostCard").then(module => ({ default: module.PostCard })));
 import { toast } from "react-hot-toast";
 import { useCallback, useMemo } from "react";
-
+import React from "react";
 // Create axios instance with interceptor
 const api = axios.create({
   baseURL: import.meta.env.VITE_BACKEND_BASEURL,
@@ -386,14 +386,14 @@ const paginatedPosts = useMemo(() => {
         color: var(--primary-color);
       }
         .ts-quick-link.active {
-  background-color: var(--primary-color);
-  color: white;
+  border: 2px solid var(--primary-color);
+  // color: white;
   border-radius: 0.5rem;
 }
 
 .dark .ts-quick-link.active {
-  background-color: var(--primary-color);
-  color: white;
+  border: 2px solid var(--primary-color);
+  // color: white;
 }
 
       /* Pagination Styles */
@@ -1076,4 +1076,4 @@ const paginatedPosts = useMemo(() => {
   );
 }
 
-export default HomePage;
+export default React.memo(HomePage);

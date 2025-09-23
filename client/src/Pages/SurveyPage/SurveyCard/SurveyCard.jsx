@@ -491,13 +491,7 @@ const SurveyCard = ({ post, onVote, onViewResults }) => {
             )}
           </button>
         ) : status === "upcoming" ? (
-          <button
-            className="survey-card-button reminder-button"
-            onClick={() => toast.success("Reminder set successfully!")}
-          >
-            <Bell className="button-icon" />
-            Set Reminder
-          </button>
+          <></>
         ) : (
           <button className="survey-card-button results-button" onClick={handleViewResultsClick}>
             <BarChart3 className="button-icon" />

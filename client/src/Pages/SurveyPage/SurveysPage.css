@@ -2077,7 +2077,7 @@ button {
 
   .reminder-button,
   .results-button {
-    background-color: #1e293b;
+    /* background-color: #1e293b; */
     color: var(--foreground);
   }
 

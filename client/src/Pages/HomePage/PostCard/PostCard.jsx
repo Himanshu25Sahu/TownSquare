@@ -1,10 +1,29 @@
-import { useReducer, useEffect, useRef, useMemo, useCallback } from "react";
+import { useReducer, useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useSelector } from "react-redux";
-import { getTimeAgo, formatDate } from "../Helpers";
+import { getTimeAgo } from "../Helpers";
 import { ImageCarousel } from "../ImageCarousel";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "./PostCard.css";
+import {
+  User,
+  BarChart3,
+  Calendar,
+  CheckCircle,
+  Clock,
+  History,
+  Star,
+  FileText,
+  MessageSquare,
+  Vote,
+  Lightbulb,
+  Bell,
+  Info,
+  PieChart,
+  Bookmark,
+  Share2,
+  MoreHorizontal,
+} from "lucide-react";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASEURL;
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_BASEURL;
@@ -25,6 +44,14 @@ const initialState = {
   visualState: 0,
   showContactForm: false,
   contactMessage: "",
+  showPollResults: false,
+  pollResults: null,
+  selectedOption: null,
+  openEndedResponse: "",
+  rating: 0,
+  isSubmitting: false,
+  isFocused: false,
+  charCount: 0,
 };
 
 const reducer = (state, action) => {
@@ -62,6 +89,20 @@ const reducer = (state, action) => {
       return { ...state, contactMessage: action.payload };
     case "RESET_CONTACT_FORM":
       return { ...state, showContactForm: false, contactMessage: "", syncAnimation: true };
+    case "SET_POLL_RESULTS":
+      return { ...state, pollResults: action.payload, showPollResults: true };
+    case "TOGGLE_POLL_RESULTS":
+      return { ...state, showPollResults: !state.showPollResults };
+    case "SET_SELECTED_OPTION":
+      return { ...state, selectedOption: action.payload };
+    case "SET_OPEN_ENDED_RESPONSE":
+      return { ...state, openEndedResponse: action.payload, charCount: action.payload.length };
+    case "SET_RATING":
+      return { ...state, rating: action.payload };
+    case "SET_IS_SUBMITTING":
+      return { ...state, isSubmitting: action.payload };
+    case "SET_IS_FOCUSED":
+      return { ...state, isFocused: action.payload };
     default:
       return state;
   }
@@ -93,33 +134,33 @@ const apiCall = async ({ method, endpoint, data = {}, headers = {}, withCredenti
 export const PostCard = ({ post, navigate }) => {
   const { token, userData } = useSelector((state) => state.user);
   const user = userData;
-const getInitialVoteState = () => {
-  const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
-  
-  // Prefer server-provided userVote if available
-  let userVote = post.userVote !== undefined ? post.userVote : (votedPosts[post._id] || null);
-  
-  // Sync localStorage to match server (if server provided a value)
-  if (post.userVote !== undefined) {
-    if (userVote) {
-      votedPosts[post._id] = userVote;
-    } else {
-      delete votedPosts[post._id];
-    }
-    localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
-  }
-  
-  // No changes needed for bookmark check
-  return {
-    ...initialState,
-    isBookmarked: user?.bookmarks?.includes(post._id) || false,
-    userVote: userVote,
-    upVotes: post.upVotes || 0,
-    downVotes: post.downVotes || 0,
-  };
-};
 
-  const [state, dispatch] = useReducer(reducer, getInitialVoteState());
+  const getInitialVoteState = useCallback(() => {
+    const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+    
+    // Prefer server-provided userVote if available
+    let userVote = post.userVote !== undefined ? post.userVote : (votedPosts[post._id] || null);
+    
+    // Sync localStorage to match server (if server provided a value)
+    if (post.userVote !== undefined) {
+      if (userVote) {
+        votedPosts[post._id] = userVote;
+      } else {
+        delete votedPosts[post._id];
+      }
+      localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
+    }
+    
+    return {
+      ...initialState,
+      isBookmarked: user?.bookmarks?.includes(post._id) || false,
+      userVote: userVote,
+      upVotes: post.upVotes || 0,
+      downVotes: post.downVotes || 0,
+    };
+  }, [post._id, post.userVote, post.upVotes, post.downVotes, user?.bookmarks]);
+
+  const [state, dispatch] = useReducer(reducer, {}, getInitialVoteState);
   const cardRef = useRef(null);
 
   const placeholders = useMemo(() => [
@@ -130,10 +171,52 @@ const getInitialVoteState = () => {
   ], []);
 
   const filteredImages = useMemo(() => {
-    return post.attachments?.filter((attachment) => attachment.fileType?.startsWith("image/")) || [];
-  }, [post.attachments]);
+    if (!post || !post.attachments) return [];
+    return post.attachments.filter((attachment) => attachment.fileType?.startsWith("image/")) || [];
+  }, [post]);
 
-  // Removed animation-related effects, keeping only placeholder cycling
+  const isPoll = useMemo(() => post.type === "poll", [post.type]);
+  const item = useMemo(() => isPoll ? post.poll : post.survey, [isPoll, post.poll, post.survey]);
+  const question = useMemo(() => isPoll ? item?.question : item?.questions[0]?.question || "", [isPoll, item]);
+  const questionType = useMemo(() => isPoll ? "multiple-choice" : item?.questions[0]?.type || "", [isPoll, item]);
+  const now = useMemo(() => new Date(), []);
+  const deadlineDate = useMemo(() => item?.deadline ? new Date(item.deadline) : null, [item?.deadline]);
+  const status = useMemo(() => {
+    return item?.status
+      ? item.status
+      : post.type === "survey" && deadlineDate
+        ? deadlineDate > now
+          ? "upcoming"
+          : deadlineDate < now
+          ? "past"
+          : "active"
+        : post.type === "survey"
+        ? "upcoming" // Default to "upcoming" for surveys without status or deadline
+        : "unknown";
+  }, [item?.status, post.type, deadlineDate, now]);
+  const deadline = useMemo(() => item?.deadline ? new Date(item.deadline) : null, [item?.deadline]);
+
+  const options = useMemo(
+    () =>
+      isPoll
+        ? post.poll?.options || []
+        : post.survey?.questions[0]?.options?.map((opt, index) => ({
+            _id: opt._id || index,
+            text: opt,
+          })) || [],
+    [isPoll, post.poll?.options, post.survey?.questions],
+  );
+
+  const hasImages = useMemo(() => filteredImages.length > 0, [filteredImages.length]);
+
+  const hasParticipated = useMemo(() => {
+    if (!user?._id) return false;
+    if (isPoll) {
+      return post.poll?.options?.some((opt) => opt.votedBy?.some((vote) => vote.userId === user._id));
+    }
+    return post.survey?.questions?.some((q) => q.responses?.some((r) => r.userId === user._id));
+  }, [isPoll, post.poll?.options, post.survey?.questions, user?._id]);
+
   useEffect(() => {
     let interval;
     if (state.showComments) {
@@ -145,15 +228,7 @@ const getInitialVoteState = () => {
       }, 3000);
     }
     return () => interval && clearInterval(interval);
-  }, [state.showComments, placeholders.length]);
-
-  // Load user vote from localStorage
-  // useEffect(() => {
-  //   const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
-  //   if (votedPosts[post._id]) {
-  //     dispatch({ type: "SET_VOTE", payload: { userVote: votedPosts[post._id], upVotes: state.upVotes, downVotes: state.downVotes } });
-  //   }
-  // }, [post._id, state.upVotes, state.downVotes]);
+  }, [state.showComments, state.placeholderIndex, placeholders.length]);
 
   const toggleBookmark = useCallback(async (e) => {
     e.stopPropagation();
@@ -201,105 +276,106 @@ const getInitialVoteState = () => {
     }
   }, [post?.title]);
 
-const handleUpvote = useCallback(async (e) => {
-  e.stopPropagation();
+  const handleUpvote = useCallback(async (e) => {
+    e.stopPropagation();
 
-  if (!token) {
-    toast.error("Authentication required to vote");
-    return;
-  }
-
-  try {
-    const endpoint = state.userVote === "upvote" ? `/post/remove/${post._id}` : `/post/up/${post._id}`;
-    const response = await apiCall({
-      method: "POST",
-      endpoint,
-      data: { token },
-    });
-
-    const newVote = state.userVote === "upvote" ? null : "upvote";
-    
-    dispatch({
-      type: "SET_VOTE",
-      payload: {
-        userVote: newVote,
-        upVotes: response.upVotes,
-        downVotes: response.downVotes,
-        isAnimating: newVote === "upvote",
-      },
-    });
-
-    // Update localStorage
-    const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
-    if (newVote) {
-      votedPosts[post._id] = newVote;
-    } else {
-      delete votedPosts[post._id];
+    if (!token) {
+      toast.error("Authentication required to vote");
+      return;
     }
-    localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
 
-    if (newVote === "upvote") {
-      setTimeout(() => dispatch({ type: "SET_ANIMATING", payload: false }), 1000);
-      const soundEnabled = localStorage.getItem("soundEnabled") === "true";
-      if (soundEnabled) {
-        const upvoteSound = new Audio("/upvote-sound.mp3");
-        upvoteSound.volume = 0.3;
-        upvoteSound.play().catch((e) => console.log("Audio failed:", e));
+    try {
+      const endpoint = state.userVote === "upvote" ? `/post/remove/${post._id}` : `/post/up/${post._id}`;
+      const response = await apiCall({
+        method: "POST",
+        endpoint,
+        data: { token },
+      });
+
+      const newVote = state.userVote === "upvote" ? null : "upvote";
+      
+      dispatch({
+        type: "SET_VOTE",
+        payload: {
+          userVote: newVote,
+          upVotes: response.upVotes,
+          downVotes: response.downVotes,
+          isAnimating: newVote === "upvote",
+        },
+      });
+
+      // Update localStorage
+      const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+      if (newVote) {
+        votedPosts[post._id] = newVote;
+      } else {
+        delete votedPosts[post._id];
       }
-    }
-  } catch (error) {
-    console.error('Upvote error:', error.response?.data || error.message);
-  }
-}, [post._id, token, state.userVote]);
+      localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
 
-const handleDownvote = useCallback(async (e) => {
-  e.stopPropagation();
-
-  if (!token) {
-    toast.error("Authentication required to vote");
-    return;
-  }
-
-  try {
-    const endpoint = state.userVote === "downvote" ? `/post/remove/${post._id}` : `/post/down/${post._id}`;
-    const response = await apiCall({
-      method: "POST",
-      endpoint,
-      data: { token },
-    });
-
-    const newVote = state.userVote === "downvote" ? null : "downvote";
-    
-    dispatch({
-      type: "SET_VOTE",
-      payload: {
-        userVote: newVote,
-        upVotes: response.upVotes,
-        downVotes: response.downVotes,
-      },
-    });
-
-    // Update localStorage
-    const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
-    if (newVote) {
-      votedPosts[post._id] = newVote;
-    } else {
-      delete votedPosts[post._id];
-    }
-    localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
-
-    if (newVote === "downvote") {
-      const soundEnabled = localStorage.getItem("soundEnabled") === "true";
-      if (soundEnabled) {
-        const downvoteSound = new Audio("/downvote-sound.mp3");
-        downvoteSound.volume = 0.3;
-        downvoteSound.play().catch((e) => console.log("Audio failed:", e));
+      if (newVote === "upvote") {
+        setTimeout(() => dispatch({ type: "SET_ANIMATING", payload: false }), 1000);
+        const soundEnabled = localStorage.getItem("soundEnabled") === "true";
+        if (soundEnabled) {
+          const upvoteSound = new Audio("/upvote-sound.mp3");
+          upvoteSound.volume = 0.3;
+          upvoteSound.play().catch((e) => console.log("Audio failed:", e));
+        }
       }
+    } catch (error) {
+      console.error('Upvote error:', error.response?.data || error.message);
     }
-  } catch (error) {
-    console.error('Downvote error:', error.response?.data || error.message);
-  }
-}, [post._id, token, state.userVote]);
+  }, [post._id, token, state.userVote]);
+
+  const handleDownvote = useCallback(async (e) => {
+    e.stopPropagation();
+
+    if (!token) {
+      toast.error("Authentication required to vote");
+      return;
+    }
+
+    try {
+      const endpoint = state.userVote === "downvote" ? `/post/remove/${post._id}` : `/post/down/${post._id}`;
+      const response = await apiCall({
+        method: "POST",
+        endpoint,
+        data: { token },
+      });
+
+      const newVote = state.userVote === "downvote" ? null : "downvote";
+      
+      dispatch({
+        type: "SET_VOTE",
+        payload: {
+          userVote: newVote,
+          upVotes: response.upVotes,
+          downVotes: response.downVotes,
+        },
+      });
+
+      // Update localStorage
+      const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+      if (newVote) {
+        votedPosts[post._id] = newVote;
+      } else {
+        delete votedPosts[post._id];
+      }
+      localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
+
+      if (newVote === "downvote") {
+        const soundEnabled = localStorage.getItem("soundEnabled") === "true";
+        if (soundEnabled) {
+          const downvoteSound = new Audio("/downvote-sound.mp3");
+          downvoteSound.volume = 0.3;
+          downvoteSound.play().catch((e) => console.log("Audio failed:", e));
+        }
+      }
+    } catch (error) {
+      console.error('Downvote error:', error.response?.data || error.message);
+    }
+  }, [post._id, token, state.userVote]);
+
   const fetchComments = useCallback(async () => {
     if (!state.showComments) {
       dispatch({ type: "SET_LOADING_COMMENTS", payload: true });
@@ -358,6 +434,377 @@ const handleDownvote = useCallback(async (e) => {
       console.error("Failed to post comment:", error);
     }
   }, [state.commentText, post._id, token]);
+
+  const handleOptionChange = useCallback((index) => {
+    dispatch({ type: "SET_SELECTED_OPTION", payload: index });
+  }, []);
+
+  const handleRatingChange = useCallback((newRating) => {
+    dispatch({ type: "SET_RATING", payload: newRating });
+  }, []);
+
+  const handleTextareaChange = useCallback((e) => {
+    dispatch({ type: "SET_OPEN_ENDED_RESPONSE", payload: e.target.value });
+  }, []);
+
+  const handleVote = useCallback(
+    async (e) => {
+      e.stopPropagation();
+      if (state.selectedOption !== null || state.openEndedResponse || state.rating > 0) {
+        dispatch({ type: "SET_IS_SUBMITTING", payload: true });
+        const voteData = {
+          option: null,
+          response: null,
+          rating: null,
+          userId: user?._id,
+        };
+
+        if (isPoll) {
+          voteData.option = options[state.selectedOption]?._id;
+        } else if (post.type === "survey") {
+          if (questionType === "multiple-choice") {
+            voteData.option = options[state.selectedOption]?._id;
+          } else if (questionType === "open-ended") {
+            voteData.response = state.openEndedResponse;
+          } else if (questionType === "rating") {
+            voteData.rating = state.rating;
+          }
+        }
+
+        try {
+          const response = await fetch(`${BASE_URL}/post/${post._id}/vote`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            credentials: "include",
+            body: JSON.stringify(voteData),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to submit vote");
+          }
+
+          dispatch({ type: "SET_POLL_OPTION", payload: state.selectedOption });
+          dispatch({ type: "SET_OPEN_ENDED_RESPONSE", payload: "" });
+          dispatch({ type: "SET_RATING", payload: 0 });
+          toast.success("Your vote has been submitted successfully!");
+
+          // Refresh post data
+          const postResponse = await apiCall({
+            method: "GET",
+            endpoint: `/post/${post._id}`,
+            data: { token },
+          });
+          if (postResponse.success) {
+            window.location.reload();
+          }
+        } catch (error) {
+          toast.error(error.message || "An error occurred while submitting your vote.");
+        } finally {
+          dispatch({ type: "SET_IS_SUBMITTING", payload: false });
+        }
+      }
+    },
+    [
+      state.selectedOption,
+      state.openEndedResponse,
+      state.rating,
+      user?._id,
+      isPoll,
+      options,
+      post._id,
+      post.type,
+      questionType,
+      token,
+    ],
+  );
+
+  const handleViewResults = useCallback(
+    async (e) => {
+      e.stopPropagation();
+      if (!state.showPollResults) {
+        try {
+          const response = await fetch(`${BASE_URL}/post/${post._id}/results`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+          });
+          if (!response.ok) throw new Error("Failed to fetch results");
+          const data = await response.json();
+          dispatch({ type: "SET_POLL_RESULTS", payload: data.results || null });
+        } catch (error) {
+          toast.error(error.message || "An error occurred while fetching results.");
+        }
+      }
+      dispatch({ type: "TOGGLE_POLL_RESULTS" });
+    },
+    [post._id, token, state.showPollResults],
+  );
+
+  const getStatusIcon = useCallback((status) => {
+    switch (status) {
+      case "active":
+        return <CheckCircle className="status-icon" />;
+      case "upcoming":
+        return <Clock className="status-icon" />;
+      case "past":
+        return <History className="status-icon" />;
+      default:
+        return null;
+    }
+  }, []);
+
+  const getStatusClass = useCallback((status) => {
+    switch (status) {
+      case "active":
+        return "status-active";
+      case "upcoming":
+        return "status-upcoming";
+      case "past":
+        return "status-past";
+      default:
+        return "status-default";
+    }
+  }, []);
+
+  const getDeadlineText = useCallback(() => {
+    if (!deadline) return "";
+    const formattedDate = deadline.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    switch (status) {
+      case "active":
+        return `Ends on ${formattedDate}`;
+      case "upcoming":
+        return `Starts on ${formattedDate}`;
+      case "past":
+        return `Ended on ${formattedDate}`;
+      default:
+        return formattedDate;
+    }
+  }, [deadline, status]);
+
+  const renderOptions = useMemo(() => {
+    if (status !== "active") return null;
+
+    if (questionType === "multiple-choice") {
+      return options.map((option, index) => (
+        <div
+          key={isPoll ? option._id : index}
+          className={`survey-card-option ${state.selectedOption === index ? "selected" : ""}`}
+          onClick={() => handleOptionChange(index)}
+        >
+          <div className="survey-card-radio-container">
+            <input
+              type="radio"
+              id={`option-${post._id}-${isPoll ? option._id : index}`}
+              name={`survey-${post._id}`}
+              value={isPoll ? option.text : option.text}
+              checked={state.selectedOption === index}
+              onChange={() => handleOptionChange(index)}
+              className="survey-card-radio"
+            />
+            <span className="survey-card-radio-checkmark"></span>
+          </div>
+          <label htmlFor={`option-${post._id}-${isPoll ? option._id : index}`} className="survey-card-option-label">
+            {isPoll ? option.text : option.text}
+          </label>
+        </div>
+      ));
+    } else if (questionType === "open-ended") {
+      return (
+        <div className={`survey-card-open-ended ${state.isFocused ? "focused" : ""}`}>
+          <div className="textarea-container">
+            <MessageSquare className="textarea-icon" />
+            <textarea
+              className="survey-card-textarea"
+              placeholder="Type your response here..."
+              value={state.openEndedResponse}
+              onChange={handleTextareaChange}
+              onFocus={() => dispatch({ type: "SET_IS_FOCUSED", payload: true })}
+              onBlur={() => dispatch({ type: "SET_IS_FOCUSED", payload: false })}
+            />
+            <div className="textarea-border"></div>
+          </div>
+          <div className="textarea-footer">
+            <div className="char-count">
+              <span className={state.charCount > 0 ? "has-text" : ""}>{state.charCount}</span> characters
+            </div>
+            <div className="textarea-hint">
+              <Info className="hint-icon" />
+              <span>Be concise and specific in your response</span>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (questionType === "rating") {
+      return (
+        <div className="survey-card-rating">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <span
+              key={star}
+              className={`survey-card-star ${star <= state.rating ? "filled" : ""}`}
+              onClick={() => handleRatingChange(star)}
+            >
+              <Star className={`star-icon ${star <= state.rating ? "filled" : ""}`} />
+            </span>
+          ))}
+          <div className="rating-label">
+            {state.rating === 0 && "Select a rating"}
+            {state.rating === 1 && "Poor"}
+            {state.rating === 2 && "Fair"}
+            {state.rating === 3 && "Good"}
+            {state.rating === 4 && "Very Good"}
+            {state.rating === 5 && "Excellent"}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }, [
+    status,
+    questionType,
+    options,
+    isPoll,
+    post._id,
+    state.selectedOption,
+    state.isFocused,
+    state.openEndedResponse,
+    state.charCount,
+    state.rating,
+    handleOptionChange,
+    handleTextareaChange,
+    handleRatingChange,
+  ]);
+
+  const renderResults = useMemo(() => {
+    if (status !== "past" || !state.pollResults || !state.showPollResults) return null;
+
+    if (post.type === "poll") {
+      return (
+        <div className="survey-card-results-container">
+          <h4 className="results-title">Poll Results</h4>
+          <div className="survey-card-results">
+            {state.pollResults.poll.options.map((option, index) => {
+              const colorClasses = ["blue", "purple", "green", "orange", "red"];
+              const colorClass = colorClasses[index % colorClasses.length];
+              const percentage =
+                state.pollResults.poll.totalVotes > 0
+                  ? Math.round((option.votes / state.pollResults.poll.totalVotes) * 100)
+                  : 0;
+              return (
+                <div key={index} className="survey-card-result">
+                  <div className="survey-card-result-header">
+                    <span className="survey-card-result-label">{option.text}</span>
+                    <span className={`survey-card-result-percentage ${colorClass}`}>{percentage}%</span>
+                  </div>
+                  <div className="survey-card-result-bar">
+                    <div
+                      className={`survey-card-result-progress ${colorClass}`}
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+                  <div className="survey-card-result-votes">
+                    <Vote className="votes-icon" />
+                    <span>
+                      {option.votes} {option.votes === 1 ? "vote" : "votes"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="survey-card-total-votes">
+              <PieChart className="total-votes-icon" />
+              <span>Total Votes: {state.pollResults.poll.totalVotes}</span>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (post.type === "survey") {
+      return (
+        <div className="survey-card-results-container">
+          <h4 className="results-title">Survey Results</h4>
+          <div className="survey-card-results">
+            {state.pollResults.survey.questions.map((question, qIndex) => (
+              <div key={qIndex} className="survey-question-results">
+                <h5 className="question-title">{question.question}</h5>
+                {question.type === "multiple-choice" ? (
+                  <>
+                    {question.options.map((option, oIndex) => {
+                      const colorClasses = ["blue", "purple", "green", "orange", "red"];
+                      const colorClass = colorClasses[oIndex % colorClasses.length];
+                      const percentage =
+                        question.totalVotes > 0 ? Math.round((option.votes / question.totalVotes) * 100) : 0;
+                      return (
+                        <div key={oIndex} className="survey-card-result">
+                          <div className="survey-card-result-header">
+                            <span className="survey-card-result-label">{option.text}</span>
+                            <span className={`survey-card-result-percentage ${colorClass}`}>{percentage}%</span>
+                          </div>
+                          <div className="survey-card-result-bar">
+                            <div
+                              className={`survey-card-result-progress ${colorClass}`}
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                          <div className="survey-card-result-votes">
+                            <Vote className="votes-icon" />
+                            <span>
+                              {option.votes} {option.votes === 1 ? "vote" : "votes"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="survey-card-total-votes">
+                      <PieChart className="total-votes-icon" />
+                      <span>Total Votes: {question.totalVotes}</span>
+                    </div>
+                  </>
+                ) : question.type === "open-ended" ? (
+                  <div className="open-ended-responses">
+                    {question.responses.map((response, rIndex) => (
+                      <div key={rIndex} className="response-item">
+                        <div className="response-content">
+                          <span className="response-text">{response.response}</span>
+                        </div>
+                        <div className="response-user-info">
+                          <div className="response-user-avatar">{response.username?.charAt(0) || "U"}</div>
+                          <span className="response-username">{response.username}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : question.type === "rating" ? (
+                  <div className="rating-results">
+                    {question.ratings.map((rating, rIndex) => (
+                      <div key={rIndex} className="rating-item">
+                        <div className="rating-stars">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star key={star} className={`rating-star ${star <= rating.rating ? "filled" : ""}`} />
+                          ))}
+                        </div>
+                        <div className="rating-user-info">
+                          <div className="rating-user-avatar">{rating.username?.charAt(0) || "U"}</div>
+                          <span className="rating-username">{rating.username}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }, [status, state.pollResults, post.type, state.showPollResults]);
 
   const renderPostHeader = useCallback(() => {
     return (
@@ -508,7 +955,7 @@ const handleDownvote = useCallback(async (e) => {
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
             </span>
             <div className="action-data"></div>
@@ -616,7 +1063,7 @@ const handleDownvote = useCallback(async (e) => {
                 className="issue-icon"
                 aria-hidden="true"
               >
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               <span>Assigned to: Community</span>
@@ -628,163 +1075,155 @@ const handleDownvote = useCallback(async (e) => {
     );
   }, [post.title, post.description, renderPostHeader, renderAttachments, renderPostActions]);
 
-  const renderPollPost = useCallback(() => {
-    const isPollActive = post.poll?.status !== "closed";
-    const hasVoted = state.selectedPollOption !== null || post.poll?.options?.some((opt) => opt.voters?.includes(user?._id));
-
-    const handlePollVote = async (optionId) => {
-      if (!token) {
-        toast.error("Authentication required to vote");
-        return;
-      }
-
-      try {
-        await apiCall({
-          method: "POST",
-          endpoint: "/post/vote",
-          data: { postId: post._id, optionId, token },
-        });
-        dispatch({ type: "SET_POLL_OPTION", payload: optionId });
-        toast.success("Vote registered");
-
-        const postResponse = await apiCall({
-          method: "GET",
-          endpoint: `/post/${post._id}`,
-          data: { token },
-        });
-        if (postResponse.success) {
-          window.location.reload();
-        }
-      } catch (error) {
-        console.error("Vote failed:", error);
-      }
-    };
-
+  const renderPollOrSurveyPost = useCallback(() => {
     return (
       <div className="post-content">
         {renderPostHeader()}
-        <h4 className="post-title">{post.title}</h4>
-        <p className="post-text">{post.description}</p>
-        {renderAttachments()}
-
-        {post.poll && (
-          <div className="poll-details">
-            <div className="poll-status">
-              {isPollActive ? (
-                <span className="poll-badge">Active Poll</span>
-              ) : (
-                <span className="poll-badge closed">Closed</span>
-              )}
-              {post.poll.endDate && (
-                <span className="poll-time-remaining">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="poll-icon" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                  {isPollActive ? `Ends ${formatDate(post.poll.endDate)}` : `Ended ${formatDate(post.poll.endDate)}`}
+        <div
+          className={`survey-card ${state.showPollResults ? "hovered" : ""} ${
+            status === "active" || status === "upcoming" ? "compact" : ""
+          }`}
+          role="region"
+          aria-label={`${post.type} card`}
+        >
+          <div className="survey-card-header">
+            <div className="survey-card-title-container">
+              <h3 className="survey-card-title">{post.title}</h3>
+              <div className="survey-card-description-container">
+                <FileText className="description-icon" />
+                <p className="survey-card-description">{post.description}</p>
+              </div>
+              <div className="survey-card-meta">
+                <span className="survey-card-type">
+                  <BarChart3 className="meta-icon" /> {post.type}
                 </span>
-              )}
-            </div>
-
-            <h5 className="poll-question">{post.poll.question}</h5>
-
-            <div className="poll-options">
-              {post.poll.options?.map((option, index) => {
-                const totalVotes = post.poll.options?.reduce((sum, opt) => sum + (opt.votes || 0), 0);
-                const percentage = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
-                const isSelected = state.selectedPollOption === option._id || option.voters?.includes(user?._id);
-
-                return (
-                  <div
-                    key={`poll-option-${post._id}-${index}`}
-                    className={`poll-option ${isSelected ? "selected" : ""}`}
-                  >
-                    <div className="poll-option-header">
-                      <span>{option.text}</span>
-                      {(hasVoted || !isPollActive) && (
-                        <span className="poll-votes">
-                          {option.votes || 0} votes ({percentage}%)
-                        </span>
-                      )}
-                    </div>
-
-                    {(hasVoted || !isPollActive) && (
-                      <div className="poll-option-bar">
-                        <div
-                          className="poll-option-progress"
-                          style={{ width: `${percentage}%` }}
-                        ></div>
-                      </div>
-                    )}
-
-                    {isPollActive && !hasVoted && (
-                      <button
-                        className="poll-vote-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePollVote(option._id);
-                        }}
-                        aria-label={`Vote for ${option.text}`}
-                      >
-                        <span className="vote-icon">
-                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            <path d="M12 5V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                          </svg>
-                        </span>
-                        Vote
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="poll-meta">
-              <div className="poll-votes">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="poll-icon"
-                  aria-hidden="true"
-                >
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                </svg>
-                <span>{post.poll.options?.reduce((sum, opt) => sum + (opt.votes || 0), 0) || 0} total votes</span>
-              </div>
-              <div className="poll-time-left">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="poll-icon"
-                  aria-hidden="true"
-                >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                <span>{isPollActive ? "Poll is active" : "Poll has ended"}</span>
+                <span className="survey-card-creator">
+                  <User className="meta-icon" />
+                  <span className="creator-name">{post.createdBy?.username || "Anonymous"}</span>
+                </span>
               </div>
             </div>
+            <span className={`survey-card-badge ${getStatusClass(status)}`}>
+              {getStatusIcon(status)}
+              <span className="status-text">{status.charAt(0).toUpperCase() + status.slice(1)}</span>
+            </span>
           </div>
-        )}
+
+          {deadline && (
+            <div className="survey-card-deadline">
+              <Calendar className="deadline-icon" />
+              {getDeadlineText()}
+            </div>
+          )}
+
+          {hasImages && (
+            <div className="survey-card-images">
+              <ImageCarousel images={filteredImages} />
+            </div>
+          )}
+
+          <div className="survey-card-content">
+            <div className="survey-card-question-container">
+              <Lightbulb className="question-icon" />
+              <p className="survey-card-question">{question}</p>
+            </div>
+
+            {renderResults}
+
+            {status === "upcoming" && (
+              <div className="survey-card-upcoming">
+                <Clock className="upcoming-icon" />
+                <div className="upcoming-content">
+                  <p>This {isPoll ? "poll" : "survey"} is not yet active.</p>
+                  <p>You can set a reminder to be notified when it starts.</p>
+                </div>
+              </div>
+            )}
+
+            {status === "active" && <div className="survey-card-options">{renderOptions}</div>}
+          </div>
+
+          <div className="survey-card-footer">
+
+
+            {status === "active" ? (
+              <button
+                className={`survey-card-button submit-button ${
+                  (state.selectedOption === null && !state.openEndedResponse && state.rating === 0) ||
+                  hasParticipated ||
+                  state.isSubmitting
+                    ? "disabled"
+                    : ""
+                } ${state.isSubmitting ? "submitting" : ""}`}
+                disabled={
+                  (state.selectedOption === null && !state.openEndedResponse && state.rating === 0) ||
+                  hasParticipated ||
+                  state.isSubmitting
+                }
+                onClick={handleVote}
+              >
+                {state.isSubmitting ? (
+                  <>
+                    <span className="button-spinner"></span>
+                    Submitting...
+                  </>
+                ) : hasParticipated ? (
+                  <>
+                    <CheckCircle className="button-icon" />
+                    Already Participated
+                  </>
+                ) : (
+                  <>
+                    <Vote className="button-icon" />
+                    Submit Response
+                  </>
+                )}
+              </button>
+            ) : status === "upcoming" ? (
+              <></>
+            ) : (
+              <button className="survey-card-button results-button" onClick={handleViewResults}>
+                <BarChart3 className="button-icon" />
+                {state.showPollResults ? "Hide Results" : "View Full Results"}
+              </button>
+            )}
+          </div>
+        </div>
         {renderPostActions()}
       </div>
     );
-  }, [post, state.selectedPollOption, user?._id, token, renderPostHeader, renderAttachments, renderPostActions]);
+  }, [
+    renderPostHeader,
+    post.title,
+    post.description,
+    post.type,
+    post.createdBy?.username,
+    state.showPollResults,
+    state.isBookmarked,
+    state.selectedOption,
+    state.openEndedResponse,
+    state.rating,
+    state.isSubmitting,
+    status,
+    deadline,
+    hasImages,
+    filteredImages,
+    question,
+    renderResults,
+    isPoll,
+    renderOptions,
+    toggleBookmark,
+    handleShareClick,
+    post._id,
+    getStatusClass,
+    getStatusIcon,
+    status,
+    getDeadlineText,
+    hasParticipated,
+    handleVote,
+    handleViewResults,
+    renderPostActions,
+  ]);
 
   const renderMarketplacePost = useCallback(() => {
     const handleContactSeller = (e) => {
@@ -1075,7 +1514,7 @@ const handleDownvote = useCallback(async (e) => {
                     className="event-icon"
                     aria-hidden="true"
                   >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 00-4 4v2"></path>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
@@ -1270,7 +1709,8 @@ const handleDownvote = useCallback(async (e) => {
         content = renderIssuePost();
         break;
       case "poll":
-        content = renderPollPost();
+      case "survey":
+        content = renderPollOrSurveyPost();
         break;
       case "marketplace":
         content = renderMarketplacePost();
@@ -1288,7 +1728,7 @@ const handleDownvote = useCallback(async (e) => {
         {renderCommentSection()}
       </>
     );
-  }, [post.type, renderIssuePost, renderPollPost, renderMarketplacePost, renderAnnouncementPost, renderGeneralPost, renderCommentSection]);
+  }, [post.type, renderIssuePost, renderPollOrSurveyPost, renderMarketplacePost, renderAnnouncementPost, renderGeneralPost, renderCommentSection]);
 
   return (
     <div
