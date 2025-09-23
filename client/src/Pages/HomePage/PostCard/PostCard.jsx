@@ -93,12 +93,33 @@ const apiCall = async ({ method, endpoint, data = {}, headers = {}, withCredenti
 export const PostCard = ({ post, navigate }) => {
   const { token, userData } = useSelector((state) => state.user);
   const user = userData;
-  const [state, dispatch] = useReducer(reducer, {
+const getInitialVoteState = () => {
+  const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+  
+  // Prefer server-provided userVote if available
+  let userVote = post.userVote !== undefined ? post.userVote : (votedPosts[post._id] || null);
+  
+  // Sync localStorage to match server (if server provided a value)
+  if (post.userVote !== undefined) {
+    if (userVote) {
+      votedPosts[post._id] = userVote;
+    } else {
+      delete votedPosts[post._id];
+    }
+    localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
+  }
+  
+  // No changes needed for bookmark check
+  return {
     ...initialState,
     isBookmarked: user?.bookmarks?.includes(post._id) || false,
+    userVote: userVote,
     upVotes: post.upVotes || 0,
     downVotes: post.downVotes || 0,
-  });
+  };
+};
+
+  const [state, dispatch] = useReducer(reducer, getInitialVoteState());
   const cardRef = useRef(null);
 
   const placeholders = useMemo(() => [
@@ -127,12 +148,12 @@ export const PostCard = ({ post, navigate }) => {
   }, [state.showComments, placeholders.length]);
 
   // Load user vote from localStorage
-  useEffect(() => {
-    const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
-    if (votedPosts[post._id]) {
-      dispatch({ type: "SET_VOTE", payload: { userVote: votedPosts[post._id], upVotes: state.upVotes, downVotes: state.downVotes } });
-    }
-  }, [post._id, state.upVotes, state.downVotes]);
+  // useEffect(() => {
+  //   const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+  //   if (votedPosts[post._id]) {
+  //     dispatch({ type: "SET_VOTE", payload: { userVote: votedPosts[post._id], upVotes: state.upVotes, downVotes: state.downVotes } });
+  //   }
+  // }, [post._id, state.upVotes, state.downVotes]);
 
   const toggleBookmark = useCallback(async (e) => {
     e.stopPropagation();
@@ -180,94 +201,105 @@ export const PostCard = ({ post, navigate }) => {
     }
   }, [post?.title]);
 
-  const handleUpvote = useCallback(async (e) => {
-    e.stopPropagation();
+const handleUpvote = useCallback(async (e) => {
+  e.stopPropagation();
 
-    if (!token) {
-      toast.error("Authentication required to vote");
-      return;
-    }
+  if (!token) {
+    toast.error("Authentication required to vote");
+    return;
+  }
 
-    try {
-      const endpoint = state.userVote === "upvote" ? `/post/remove/${post._id}` : `/post/up/${post._id}`;
-      const response = await apiCall({
-        method: "POST",
-        endpoint,
-        data: { token },
-      });
+  try {
+    const endpoint = state.userVote === "upvote" ? `/post/remove/${post._id}` : `/post/up/${post._id}`;
+    const response = await apiCall({
+      method: "POST",
+      endpoint,
+      data: { token },
+    });
 
-      const newVote = state.userVote === "upvote" ? null : "upvote";
-      dispatch({
-        type: "SET_VOTE",
-        payload: {
-          userVote: newVote,
-          upVotes: response.upVotes,
-          downVotes: response.downVotes,
-          isAnimating: newVote === "upvote",
-        },
-      });
+    const newVote = state.userVote === "upvote" ? null : "upvote";
+    
+    dispatch({
+      type: "SET_VOTE",
+      payload: {
+        userVote: newVote,
+        upVotes: response.upVotes,
+        downVotes: response.downVotes,
+        isAnimating: newVote === "upvote",
+      },
+    });
 
-      const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+    // Update localStorage
+    const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+    if (newVote) {
       votedPosts[post._id] = newVote;
-      localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
+    } else {
+      delete votedPosts[post._id];
+    }
+    localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
 
-      if (newVote === "upvote") {
-        setTimeout(() => dispatch({ type: "SET_ANIMATING", payload: false }), 1000);
-        const soundEnabled = localStorage.getItem("soundEnabled") === "true";
-        if (soundEnabled) {
-          const upvoteSound = new Audio("/upvote-sound.mp3");
-          upvoteSound.volume = 0.3;
-          upvoteSound.play().catch((e) => console.log("Audio failed:", e));
-        }
+    if (newVote === "upvote") {
+      setTimeout(() => dispatch({ type: "SET_ANIMATING", payload: false }), 1000);
+      const soundEnabled = localStorage.getItem("soundEnabled") === "true";
+      if (soundEnabled) {
+        const upvoteSound = new Audio("/upvote-sound.mp3");
+        upvoteSound.volume = 0.3;
+        upvoteSound.play().catch((e) => console.log("Audio failed:", e));
       }
-    } catch (error) {
-      // Error handled in apiCall
     }
-  }, [post._id, token, state.userVote]);
+  } catch (error) {
+    console.error('Upvote error:', error.response?.data || error.message);
+  }
+}, [post._id, token, state.userVote]);
 
-  const handleDownvote = useCallback(async (e) => {
-    e.stopPropagation();
+const handleDownvote = useCallback(async (e) => {
+  e.stopPropagation();
 
-    if (!token) {
-      toast.error("Authentication required to vote");
-      return;
-    }
+  if (!token) {
+    toast.error("Authentication required to vote");
+    return;
+  }
 
-    try {
-      const endpoint = state.userVote === "downvote" ? `/post/remove/${post._id}` : `/post/down/${post._id}`;
-      const response = await apiCall({
-        method: "POST",
-        endpoint,
-        data: { token },
-      });
+  try {
+    const endpoint = state.userVote === "downvote" ? `/post/remove/${post._id}` : `/post/down/${post._id}`;
+    const response = await apiCall({
+      method: "POST",
+      endpoint,
+      data: { token },
+    });
 
-      const newVote = state.userVote === "downvote" ? null : "downvote";
-      dispatch({
-        type: "SET_VOTE",
-        payload: {
-          userVote: newVote,
-          upVotes: response.upVotes,
-          downVotes: response.downVotes,
-        },
-      });
+    const newVote = state.userVote === "downvote" ? null : "downvote";
+    
+    dispatch({
+      type: "SET_VOTE",
+      payload: {
+        userVote: newVote,
+        upVotes: response.upVotes,
+        downVotes: response.downVotes,
+      },
+    });
 
-      const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+    // Update localStorage
+    const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
+    if (newVote) {
       votedPosts[post._id] = newVote;
-      localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
-
-      if (newVote === "downvote") {
-        const soundEnabled = localStorage.getItem("soundEnabled") === "true";
-        if (soundEnabled) {
-          const downvoteSound = new Audio("/downvote-sound.mp3");
-          downvoteSound.volume = 0.3;
-          downvoteSound.play().catch((e) => console.log("Audio failed:", e));
-        }
-      }
-    } catch (error) {
-      // Error handled in apiCall
+    } else {
+      delete votedPosts[post._id];
     }
-  }, [post._id, token, state.userVote]);
+    localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
 
+    if (newVote === "downvote") {
+      const soundEnabled = localStorage.getItem("soundEnabled") === "true";
+      if (soundEnabled) {
+        const downvoteSound = new Audio("/downvote-sound.mp3");
+        downvoteSound.volume = 0.3;
+        downvoteSound.play().catch((e) => console.log("Audio failed:", e));
+      }
+    }
+  } catch (error) {
+    console.error('Downvote error:', error.response?.data || error.message);
+  }
+}, [post._id, token, state.userVote]);
   const fetchComments = useCallback(async () => {
     if (!state.showComments) {
       dispatch({ type: "SET_LOADING_COMMENTS", payload: true });
