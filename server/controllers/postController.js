@@ -205,13 +205,13 @@ export const getCountyPosts = async (req, res) => {
     const requestingUserId = req.user.id;
     const { page = 1, limit = 10 } = req.query;
     const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const limitNum = Math.min(parseInt(limit, 10), 20); // Cap limit for performance
 
     if (isNaN(pageNum) || pageNum < 1 || isNaN(limitNum) || limitNum < 1) {
       return res.status(400).json({ success: false, message: "Invalid page or limit" });
     }
 
-    const user = await User.findById(requestingUserId);
+    const user = await User.findById(requestingUserId, "location.county").lean();
     if (!user || !user.location?.county) {
       return res.status(400).json({ success: false, message: "User or county not found" });
     }
@@ -231,7 +231,7 @@ export const getCountyPosts = async (req, res) => {
         console.log(`Decompression time: ${(performance.now() - decompressStartTime).toFixed(2)}ms`);
       }
     } catch (redisError) {
-      console.error("Redis error:", redisError);
+      console.error("Redis error:", redisError.message);
     }
     const cacheEndTime = performance.now();
 
@@ -243,7 +243,18 @@ export const getCountyPosts = async (req, res) => {
 
     console.log(`Cache miss for key: ${cacheKey}`);
     const dbStartTime = performance.now();
+
+    // Pre-fetch user IDs for optimization
+    const countyUserIds = await User.find({ "location.county": userCounty }, "_id").lean();
+    const userIds = countyUserIds.map(user => user._id);
+
     const posts = await Post.aggregate([
+      {
+        $match: {
+          createdBy: { $in: userIds },
+          type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
+        },
+      },
       {
         $lookup: {
           from: "users",
@@ -253,12 +264,6 @@ export const getCountyPosts = async (req, res) => {
         },
       },
       { $unwind: "$creator" },
-      {
-        $match: {
-          "creator.location.county": userCounty,
-          type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
-        },
-      },
       {
         $addFields: {
           userVote: {
@@ -287,6 +292,7 @@ export const getCountyPosts = async (req, res) => {
           type: 1,
           createdAt: 1,
           updatedAt: 1,
+          attachments: 1, // Include attachments
           upVotes: 1,
           downVotes: 1,
           important: 1,
@@ -302,10 +308,10 @@ export const getCountyPosts = async (req, res) => {
           userVote: 1,
         },
       },
-    ]);
+    ]).exec();
 
     const totalPosts = await Post.countDocuments({
-      createdBy: { $in: await User.find({ "location.county": userCounty }).distinct("_id") },
+      createdBy: { $in: userIds },
       type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
     });
 
@@ -320,12 +326,13 @@ export const getCountyPosts = async (req, res) => {
     }));
 
     const trending = await Post.find({
-      createdBy: { $in: await User.find({ "location.county": userCounty }).distinct("_id") },
+      createdBy: { $in: userIds },
       upVotes: { $gt: 0 },
     })
       .sort({ upVotes: -1 })
       .limit(5)
-      .select("_id title upVotes");
+      .select("_id title upVotes")
+      .lean();
 
     const dbEndTime = performance.now();
     console.log(`Database query time: ${(dbEndTime - dbStartTime).toFixed(2)}ms`);
@@ -348,6 +355,7 @@ export const getCountyPosts = async (req, res) => {
           type: post.type,
           createdAt: post.createdAt,
           updatedAt: post.updatedAt,
+          attachments: post.attachments, // Include attachments in cache
           upVotes: post.upVotes,
           downVotes: post.downVotes,
           important: post.important,
@@ -366,13 +374,13 @@ export const getCountyPosts = async (req, res) => {
       console.log(`Compression time: ${(performance.now() - compressStartTime).toFixed(2)}ms`);
       await redis.set(cacheKey, compressedData, { ex: 300 });
     } catch (redisError) {
-      console.error("Failed to set cache:", redisError);
+      console.error("Failed to set cache:", redisError.message);
     }
 
     console.log(`Total request time (cache miss): ${(performance.now() - startTime).toFixed(2)}ms`);
     res.status(200).json(response);
   } catch (error) {
-    console.error("Error in getCountyPosts:", error);
+    console.error("Error in getCountyPosts:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
