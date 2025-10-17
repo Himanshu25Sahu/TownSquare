@@ -7,7 +7,11 @@ import {
 import ErrorHandler from "../utils/errorHandler.js";
 import mongoose from "mongoose";
 import { User } from "../models/userModel.js";
-
+import { redis } from "../app.js";
+import { gzip,gunzip } from "zlib";
+import { promisify } from "util";
+const gzipAsync = promisify(gzip);
+const gunzipAsync = promisify(gunzip);
 export const createPost = async (req, res) => {
   try {
     const { title, description, type, important, poll, survey, marketplace } =
@@ -197,51 +201,75 @@ export const createPost = async (req, res) => {
 
 export const getCountyPosts = async (req, res) => {
   try {
+    const startTime = performance.now();
     const requestingUserId = req.user.id;
     const { page = 1, limit = 10 } = req.query;
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
 
-    // Validate pagination parameters
     if (isNaN(pageNum) || pageNum < 1 || isNaN(limitNum) || limitNum < 1) {
-      return res.status(400).json({ success: false, message: 'Invalid page or limit' });
+      return res.status(400).json({ success: false, message: "Invalid page or limit" });
     }
 
-    // Fetch user to get county (assuming this is unchanged)
     const user = await User.findById(requestingUserId);
     if (!user || !user.location?.county) {
-      return res.status(400).json({ success: false, message: 'User or county not found' });
+      return res.status(400).json({ success: false, message: "User or county not found" });
     }
     const userCounty = user.location.county;
 
+    const cacheKey = `posts:${requestingUserId}:${userCounty}:${pageNum}:${limitNum}`;
+
+    let cachedData;
+    const redisStartTime = performance.now();
+    try {
+      const rawData = await redis.get(cacheKey);
+      const redisEndTime = performance.now();
+      if (rawData) {
+        const decompressStartTime = performance.now();
+        cachedData = JSON.parse(await gunzipAsync(Buffer.from(rawData)));
+        console.log(`Redis lookup time: ${(redisEndTime - redisStartTime).toFixed(2)}ms`);
+        console.log(`Decompression time: ${(performance.now() - decompressStartTime).toFixed(2)}ms`);
+      }
+    } catch (redisError) {
+      console.error("Redis error:", redisError);
+    }
+    const cacheEndTime = performance.now();
+
+    if (cachedData) {
+      console.log(`Cache hit for key: ${cacheKey}, Total cache time: ${(cacheEndTime - redisStartTime).toFixed(2)}ms`);
+      console.log(`Total request time (cache hit): ${(performance.now() - startTime).toFixed(2)}ms`);
+      return res.status(200).json(cachedData);
+    }
+
+    console.log(`Cache miss for key: ${cacheKey}`);
+    const dbStartTime = performance.now();
     const posts = await Post.aggregate([
       {
         $lookup: {
-          from: 'users',
-          localField: 'createdBy',
-          foreignField: '_id',
-          as: 'creator',
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "creator",
         },
       },
-      { $unwind: '$creator' },
+      { $unwind: "$creator" },
       {
         $match: {
-          'creator.location.county': userCounty,
-          type: { $in: ['announcements', 'poll', 'survey', 'general', 'marketplace', 'issue'] },
+          "creator.location.county": userCounty,
+          type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
         },
       },
-      // Add userVote field
       {
         $addFields: {
           userVote: {
             $reduce: {
-              input: { $ifNull: ['$votedUsers', []] },
+              input: { $ifNull: ["$votedUsers", []] },
               initialValue: null,
               in: {
                 $cond: [
-                  { $eq: ['$$this.userId', new mongoose.Types.ObjectId(requestingUserId)] },
-                  '$$this.voteType',
-                  '$$value',
+                  { $eq: ["$$this.userId", new mongoose.Types.ObjectId(requestingUserId)] },
+                  "$$this.voteType",
+                  "$$value",
                 ],
               },
             },
@@ -259,31 +287,28 @@ export const getCountyPosts = async (req, res) => {
           type: 1,
           createdAt: 1,
           updatedAt: 1,
-          attachments: 1,
           upVotes: 1,
           downVotes: 1,
           important: 1,
           commentCount: 1,
           createdBy: {
-            _id: '$creator._id',
-            username: '$creator.username',
-            email: '$creator.email',
-            avatar: '$creator.avatar',
+            _id: "$creator._id",
+            username: "$creator.username",
+            email: "$creator.email",
+            avatar: "$creator.avatar",
           },
           marketplace: 1,
           poll: 1,
-          userVote: 1, // Ensure userVote is included
+          userVote: 1,
         },
       },
     ]);
 
-    // Calculate total posts for pagination
     const totalPosts = await Post.countDocuments({
-      createdBy: { $in: await User.find({ 'location.county': userCounty }).distinct('_id') },
-      type: { $in: ['announcements', 'poll', 'survey', 'general', 'marketplace', 'issue'] },
+      createdBy: { $in: await User.find({ "location.county": userCounty }).distinct("_id") },
+      type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
     });
 
-    // Format posts (assuming this is unchanged)
     const formattedPosts = posts.map((post) => ({
       ...post,
       createdBy: {
@@ -294,28 +319,63 @@ export const getCountyPosts = async (req, res) => {
       },
     }));
 
-    // Fetch trending posts (assuming this is unchanged)
     const trending = await Post.find({
-      createdBy: { $in: await User.find({ 'location.county': userCounty }).distinct('_id') },
+      createdBy: { $in: await User.find({ "location.county": userCounty }).distinct("_id") },
       upVotes: { $gt: 0 },
     })
       .sort({ upVotes: -1 })
       .limit(5)
-      .select('_id title upVotes');
+      .select("_id title upVotes");
 
-    res.status(200).json({
+    const dbEndTime = performance.now();
+    console.log(`Database query time: ${(dbEndTime - dbStartTime).toFixed(2)}ms`);
+
+    const response = {
       success: true,
       posts: formattedPosts,
       trending,
       county: userCounty,
       totalPosts,
-    });
+    };
+
+    try {
+      const cacheResponse = {
+        success: response.success,
+        posts: response.posts.map(post => ({
+          _id: post._id,
+          title: post.title,
+          description: post.description,
+          type: post.type,
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+          upVotes: post.upVotes,
+          downVotes: post.downVotes,
+          important: post.important,
+          commentCount: post.commentCount,
+          createdBy: post.createdBy,
+          marketplace: post.marketplace,
+          poll: post.poll,
+          userVote: post.userVote,
+        })),
+        trending: response.trending,
+        county: response.county,
+        totalPosts: response.totalPosts,
+      };
+      const compressStartTime = performance.now();
+      const compressedData = await gzipAsync(JSON.stringify(cacheResponse));
+      console.log(`Compression time: ${(performance.now() - compressStartTime).toFixed(2)}ms`);
+      await redis.set(cacheKey, compressedData, { ex: 300 });
+    } catch (redisError) {
+      console.error("Failed to set cache:", redisError);
+    }
+
+    console.log(`Total request time (cache miss): ${(performance.now() - startTime).toFixed(2)}ms`);
+    res.status(200).json(response);
   } catch (error) {
-    console.error('Error in getCountyPosts:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error("Error in getCountyPosts:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 // Helper functions
 function getTimeRemaining(endtime) {
   if (!endtime) return { days: 0, hours: 0, formatted: "No deadline" };

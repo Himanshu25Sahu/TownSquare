@@ -8,9 +8,15 @@ import { emergencyRouter } from "./routes/emergencyRouter.js";
 import { error } from "./middlewares/error.js";
 import session from 'express-session';
 import { MessageRouter } from "./routes/messageRouter.js";
+import {Redis} from "@upstash/redis"
 
 export const app = express();
 dotenv.config()
+
+export const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL,
+  token: process.env.UPSTASH_REDIS_TOKEN,
+});
 
 app.use(express.json());
 app.use(cookieParser());

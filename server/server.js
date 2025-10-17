@@ -5,10 +5,14 @@ import cron from "node-cron"; // Import cron for scheduling
 import { updatePostStatus } from "./utils/updatePostStatus.js"; // Import the function
 import http from "http"; // Import http module
 import { Server } from "socket.io"; // Import Socket.IO
+import { redis } from "./app.js";
 
 // Load environment variables
 dotenv.config();
-
+const start = performance.now();
+redis.ping()
+  .then((pong) => console.log(`Redis ping: ${pong}, Time: ${(performance.now() - start).toFixed(2)}ms`))
+  .catch((err) => console.error("Redis ping error:", err));
 // Connect to the database
 connection()
   .then(() => {
