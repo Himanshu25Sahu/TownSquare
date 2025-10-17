@@ -1,4 +1,3 @@
-
 import { useState } from "react"
 
 export const ImageCarousel = ({ images }) => {
@@ -62,6 +61,9 @@ export const ImageCarousel = ({ images }) => {
                 src={image.url || "/placeholder.svg?height=300&width=400"}
                 alt={`Image ${index + 1}`}
                 className="ts-carousel-image"
+                loading={index === 0 ? "eager" : "lazy"}
+                width="400"
+                height="300"
               />
             </div>
           ))}

@@ -124,6 +124,9 @@ export const HeroCarousel = ({ items, navigate, posts }) => {
                         "/placeholder.svg"
                       }
                       alt={item.title}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      width="1000"
+                      height="500"
                     />
                   ) : (
                     <div className="ts-hero-image-placeholder">
