@@ -12,6 +12,7 @@ const PostCard = lazy(() => import("./PostCard/PostCard").then(module => ({ defa
 import { toast } from "react-hot-toast";
 import { useCallback, useMemo } from "react";
 import React from "react";
+import TownsquareSkeleton from "../../components/HomePageSkeleton";
 // Create axios instance with interceptor
 const api = axios.create({
   baseURL: import.meta.env.VITE_BACKEND_BASEURL,
@@ -506,10 +507,7 @@ const paginatedPosts = useMemo(() => {
       {/* Main Content */}
       <div className="ts-home-content">
         {loading ? (
-          <div className="ts-loading-container">
-            <div className="ts-loading-spinner"></div>
-            <p>Loading community content...</p>
-          </div>
+          <TownsquareSkeleton/>
         ) : (
           <>
             {/* Hero Carousel */}

@@ -372,7 +372,7 @@ export const getCountyPosts = async (req, res) => {
       const compressStartTime = performance.now();
       const compressedData = await gzipAsync(JSON.stringify(cacheResponse));
       console.log(`Compression time: ${(performance.now() - compressStartTime).toFixed(2)}ms`);
-      await redis.set(cacheKey, compressedData, { ex: 300 });
+      await redis.set(cacheKey, compressedData, { ex: 120 });
     } catch (redisError) {
       console.error("Failed to set cache:", redisError.message);
     }
