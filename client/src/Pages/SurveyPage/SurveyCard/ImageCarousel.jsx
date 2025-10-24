@@ -7,15 +7,17 @@ const ImageCarousel = ({ images }) => {
   const [touchEnd, setTouchEnd] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const handleNext = () => {
-    if (isTransitioning) return;
+  const handleNext = (e) => {
+    e?.stopPropagation();
+    if (isTransitioning || !images || images.length <= 1) return;
     setIsTransitioning(true);
     setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
     setTimeout(() => setIsTransitioning(false), 500);
   };
 
-  const handlePrev = () => {
-    if (isTransitioning) return;
+  const handlePrev = (e) => {
+    e?.stopPropagation();
+    if (isTransitioning || !images || images.length <= 1) return;
     setIsTransitioning(true);
     setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
     setTimeout(() => setIsTransitioning(false), 500);
@@ -38,6 +40,10 @@ const ImageCarousel = ({ images }) => {
     }
   };
 
+  if (!images || images.length === 0) {
+    return null;
+  }
+
   return (
     <div className="image-carousel">
       <div
@@ -51,11 +57,14 @@ const ImageCarousel = ({ images }) => {
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
           {images.map((image, index) => (
-            <div key={index} className="carousel-slide">
+            <div key={`image-slide-${index}`} className="carousel-slide">
               <img
                 src={image || "/placeholder.svg?height=300&width=400"}
                 alt={`Image ${index + 1}`}
                 className="carousel-image"
+                loading={index === 0 ? "eager" : "lazy"}
+                width="400"
+                height="300"
               />
             </div>
           ))}
@@ -64,14 +73,20 @@ const ImageCarousel = ({ images }) => {
         {images.length > 1 && (
           <>
             <button
-              onClick={handlePrev}
+              onClick={(e) => {
+                handlePrev(e);
+                e.stopPropagation();
+              }}
               className="carousel-button carousel-button-prev"
               aria-label="Previous image"
             >
               <ChevronLeft className="carousel-icon" />
             </button>
             <button
-              onClick={handleNext}
+              onClick={(e) => {
+                handleNext(e);
+                e.stopPropagation();
+              }}
               className="carousel-button carousel-button-next"
               aria-label="Next image"
             >
@@ -79,11 +94,13 @@ const ImageCarousel = ({ images }) => {
             </button>
             <div className="carousel-indicators">
               {images.map((_, index) => (
-                <div
-                  key={index}
+                <button
+                  key={`indicator-${index}`}
                   className={`carousel-indicator ${index === currentIndex ? "active" : ""}`}
-                  onClick={() => setCurrentIndex(index)}
-                  role="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentIndex(index);
+                  }}
                   aria-label={`Go to image ${index + 1}`}
                 />
               ))}

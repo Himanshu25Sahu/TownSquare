@@ -811,7 +811,14 @@ export const PostCard = ({ post, navigate }) => {
       <div className="post-header">
         <div className="avatar-container">
           {post.createdBy?.avatar ? (
-            <img src={post.createdBy.avatar || "/placeholder.svg"} alt={post.createdBy.username || "Anonymous user"} className="avatar" />
+            <img 
+              src={post.createdBy.avatar || "/placeholder.svg"} 
+              alt={post.createdBy.username || "Anonymous user"} 
+              className="avatar"
+              loading="lazy"
+              width="40"
+              height="40" 
+            />
           ) : (
             <div className="avatar">
               <span>{post.createdBy?.username?.charAt(0) || "U"}</span>
@@ -1641,6 +1648,9 @@ export const PostCard = ({ post, navigate }) => {
                       src={comment.userId.avatar || "/placeholder.svg"}
                       alt={comment.userId.username || "Anonymous user"}
                       className="comment-avatar"
+                      loading="lazy"
+                      width="32"
+                      height="32"
                     />
                   ) : (
                     <div className="comment-avatar">
