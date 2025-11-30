@@ -276,35 +276,52 @@ export const PostCard = ({ post, navigate }) => {
     }
   }, [post?.title]);
 
-  const handleUpvote = useCallback(async (e) => {
-    e.stopPropagation();
+    const handleUpvote = useCallback(async (e) => {
+      e.stopPropagation();
 
-    if (!token) {
-      toast.error("Authentication required to vote");
-      return;
-    }
+      if (!token) {
+        toast.error("Authentication required to vote");
+        return;
+      }
 
-    try {
-      const endpoint = state.userVote === "upvote" ? `/post/remove/${post._id}` : `/post/up/${post._id}`;
-      const response = await apiCall({
-        method: "POST",
-        endpoint,
-        data: { token },
-      });
+      // Optimistic update - update UI immediately
+      const currentUserVote = state.userVote;
+      const currentUpVotes = state.upVotes;
+      const currentDownVotes = state.downVotes;
 
-      const newVote = state.userVote === "upvote" ? null : "upvote";
-      
+      let newVote;
+      let newUpVotes;
+      let newDownVotes;
+
+      if (currentUserVote === "upvote") {
+        // Removing upvote
+        newVote = null;
+        newUpVotes = Math.max(0, currentUpVotes - 1);
+        newDownVotes = currentDownVotes;
+      } else if (currentUserVote === "downvote") {
+        // Switching from downvote to upvote
+        newVote = "upvote";
+        newUpVotes = currentUpVotes + 1;
+        newDownVotes = Math.max(0, currentDownVotes - 1);
+      } else {
+        // New upvote
+        newVote = "upvote";
+        newUpVotes = currentUpVotes + 1;
+        newDownVotes = currentDownVotes;
+      }
+
+      // Immediate UI update
       dispatch({
         type: "SET_VOTE",
         payload: {
           userVote: newVote,
-          upVotes: response.upVotes,
-          downVotes: response.downVotes,
+          upVotes: newUpVotes,
+          downVotes: newDownVotes,
           isAnimating: newVote === "upvote",
         },
       });
 
-      // Update localStorage
+      // Update localStorage immediately
       const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
       if (newVote) {
         votedPosts[post._id] = newVote;
@@ -313,6 +330,7 @@ export const PostCard = ({ post, navigate }) => {
       }
       localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
 
+      // Play sound immediately
       if (newVote === "upvote") {
         setTimeout(() => dispatch({ type: "SET_ANIMATING", payload: false }), 1000);
         const soundEnabled = localStorage.getItem("soundEnabled") === "true";
@@ -322,39 +340,79 @@ export const PostCard = ({ post, navigate }) => {
           upvoteSound.play().catch((e) => console.log("Audio failed:", e));
         }
       }
-    } catch (error) {
-      console.error('Upvote error:', error.response?.data || error.message);
-    }
-  }, [post._id, token, state.userVote]);
 
-  const handleDownvote = useCallback(async (e) => {
-    e.stopPropagation();
+      // API call in background
+      try {
+        const endpoint = currentUserVote === "upvote" ? `/post/remove/${post._id}` : `/post/up/${post._id}`;
+        await apiCall({
+          method: "POST",
+          endpoint,
+          data: { token },
+        });
+        
+        // If the API call succeeds, we're already in the correct state
+        // If it fails, we could revert the optimistic update, but usually we keep it for better UX
+        
+      } catch (error) {
+        console.error('Upvote error:', error.response?.data || error.message);
+        // Optional: Revert optimistic update on error
+        // dispatch({
+        //   type: "SET_VOTE",
+        //   payload: {
+        //     userVote: currentUserVote,
+        //     upVotes: currentUpVotes,
+        //     downVotes: currentDownVotes,
+        //   },
+        // });
+        // toast.error("Failed to update vote");
+      }
+    }, [post._id, token, state.userVote, state.upVotes, state.downVotes]);
 
-    if (!token) {
-      toast.error("Authentication required to vote");
-      return;
-    }
+    const handleDownvote = useCallback(async (e) => {
+      e.stopPropagation();
 
-    try {
-      const endpoint = state.userVote === "downvote" ? `/post/remove/${post._id}` : `/post/down/${post._id}`;
-      const response = await apiCall({
-        method: "POST",
-        endpoint,
-        data: { token },
-      });
+      if (!token) {
+        toast.error("Authentication required to vote");
+        return;
+      }
 
-      const newVote = state.userVote === "downvote" ? null : "downvote";
-      
+      // Optimistic update - update UI immediately
+      const currentUserVote = state.userVote;
+      const currentUpVotes = state.upVotes;
+      const currentDownVotes = state.downVotes;
+
+      let newVote;
+      let newUpVotes;
+      let newDownVotes;
+
+      if (currentUserVote === "downvote") {
+        // Removing downvote
+        newVote = null;
+        newUpVotes = currentUpVotes;
+        newDownVotes = Math.max(0, currentDownVotes - 1);
+      } else if (currentUserVote === "upvote") {
+        // Switching from upvote to downvote
+        newVote = "downvote";
+        newUpVotes = Math.max(0, currentUpVotes - 1);
+        newDownVotes = currentDownVotes + 1;
+      } else {
+        // New downvote
+        newVote = "downvote";
+        newUpVotes = currentUpVotes;
+        newDownVotes = currentDownVotes + 1;
+      }
+
+      // Immediate UI update
       dispatch({
         type: "SET_VOTE",
         payload: {
           userVote: newVote,
-          upVotes: response.upVotes,
-          downVotes: response.downVotes,
+          upVotes: newUpVotes,
+          downVotes: newDownVotes,
         },
       });
 
-      // Update localStorage
+      // Update localStorage immediately
       const votedPosts = JSON.parse(localStorage.getItem("votedPosts") || "{}");
       if (newVote) {
         votedPosts[post._id] = newVote;
@@ -363,6 +421,7 @@ export const PostCard = ({ post, navigate }) => {
       }
       localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
 
+      // Play sound immediately
       if (newVote === "downvote") {
         const soundEnabled = localStorage.getItem("soundEnabled") === "true";
         if (soundEnabled) {
@@ -371,10 +430,32 @@ export const PostCard = ({ post, navigate }) => {
           downvoteSound.play().catch((e) => console.log("Audio failed:", e));
         }
       }
-    } catch (error) {
-      console.error('Downvote error:', error.response?.data || error.message);
-    }
-  }, [post._id, token, state.userVote]);
+
+      // API call in background
+      try {
+        const endpoint = currentUserVote === "downvote" ? `/post/remove/${post._id}` : `/post/down/${post._id}`;
+        await apiCall({
+          method: "POST",
+          endpoint,
+          data: { token },
+        });
+        
+        // If the API call succeeds, we're already in the correct state
+        
+      } catch (error) {
+        console.error('Downvote error:', error.response?.data || error.message);
+        // Optional: Revert optimistic update on error
+        // dispatch({
+        //   type: "SET_VOTE",
+        //   payload: {
+        //     userVote: currentUserVote,
+        //     upVotes: currentUpVotes,
+        //     downVotes: currentDownVotes,
+        //   },
+        // });
+        // toast.error("Failed to update vote");
+      }
+    }, [post._id, token, state.userVote, state.upVotes, state.downVotes]);
 
   const fetchComments = useCallback(async () => {
     if (!state.showComments) {
