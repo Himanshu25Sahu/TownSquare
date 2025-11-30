@@ -19,6 +19,8 @@ const api = axios.create({
   withCredentials: true,
 });
 
+
+
 function HomePage() {
   const [activeTab, setActiveTab] = useState("all");
   const [pageData, setPageData] = useState({
@@ -462,6 +464,8 @@ const paginatedPosts = useMemo(() => {
     return <div>Loading authentication...</div>;
   }
 
+  const isInitialLoading = loading && pageData.posts.length === 0 && currentPage === 1;
+
   return (
     <div className="ts-home-container">
       {/* Header Section */}
@@ -506,7 +510,7 @@ const paginatedPosts = useMemo(() => {
 
       {/* Main Content */}
       <div className="ts-home-content">
-        {loading ? (
+        {isInitialLoading ? (
           <TownsquareSkeleton/>
         ) : (
           <>
