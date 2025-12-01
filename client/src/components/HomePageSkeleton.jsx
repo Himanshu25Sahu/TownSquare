@@ -1,4 +1,63 @@
-import "./HomePageSkeleton.css"
+
+const PulseLoader = ({ size = 'medium' }) => {
+  const sizeMap = {
+    small: '24px',
+    medium: '40px',
+    large: '64px'
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '16px',
+      padding: '40px'
+    }}>
+      <div style={{
+        width: sizeMap[size],
+        height: sizeMap[size],
+        borderRadius: '50%',
+        background: 'var(--pulse-loader-color, #3b82f6)',
+        animation: 'pulse-animation 1.5s ease-in-out infinite'
+      }} />
+      <style>{`
+        @keyframes pulse-animation {
+          0%, 100% {
+            transform: scale(0.8);
+            opacity: 0.5;
+          }
+          50% {
+            transform: scale(1.2);
+            opacity: 1;
+          }
+        }
+
+        /* Light mode */
+        :root {
+          --pulse-loader-color: #3b82f6;
+        }
+
+        /* Dark mode */
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --pulse-loader-color: #60a5fa;
+          }
+        }
+
+        /* Manual dark mode class support */
+        .dark {
+          --pulse-loader-color: #60a5fa;
+        }
+
+        [data-theme="dark"] {
+          --pulse-loader-color: #60a5fa;
+        }
+      `}</style>
+    </div>
+  );
+};
 
 const TownsquareSkeleton = () => {
   return (
@@ -13,6 +72,9 @@ const TownsquareSkeleton = () => {
           <div key={i} className="ts-skeleton-quick-link"></div>
         ))}
       </div>
+
+      {/* Pulse Loader */}
+      <PulseLoader size="medium" />
 
       {/* Main Content Grid */}
       <div className="ts-skeleton-content-grid">

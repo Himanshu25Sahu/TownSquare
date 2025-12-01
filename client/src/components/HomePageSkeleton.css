@@ -28,8 +28,12 @@
   min-height: 100vh;
   position: relative;
   z-index: 1;
+    animation-play-state: running;
+  will-change: auto;
 }
-
+.ts-skeleton-container * {
+  animation-delay: -1s !important; /* Start animations mid-way to avoid the left-to-right effect */
+}
 /* Header Skeleton */
 .ts-skeleton-header {
   margin-bottom: 2.5rem;

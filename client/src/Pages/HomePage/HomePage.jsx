@@ -38,6 +38,7 @@ function HomePage() {
   const [contactStates, setContactStates] = useState({});
   const { isDarkMode, toggleDarkMode } = useTheme();
   const [isTokenLoading, setIsTokenLoading] = useState(true);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const { userData, token } = useSelector((state) => state.user);
 
   // Add request and response interceptors
@@ -157,6 +158,7 @@ const response = await api.get(`/post/getFeed?page=${currentPage}&limit=${postsP
         setTotalPosts(0);
       } finally {
         setLoading(false);
+        setHasLoadedOnce(true);
       }
     };
 
@@ -464,7 +466,8 @@ const paginatedPosts = useMemo(() => {
     return <div>Loading authentication...</div>;
   }
 
-  const isInitialLoading = loading && pageData.posts.length === 0 && currentPage === 1;
+
+const isInitialLoading = loading && pageData.posts.length === 0 && currentPage === 1 && !hasLoadedOnce;
 
   return (
     <div className="ts-home-container">
