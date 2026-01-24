@@ -105,10 +105,19 @@ function Sidebar() {
   const toggleSidebar = useCallback(() => setIsCollapsed((prev) => !prev), [])
   const toggleMobileSidebar = useCallback(() => setIsMobileOpen((prev) => !prev), [])
   
-  const handleLogout = useCallback(() => {
-    dispatch(logout())
-    navigate("/login")
-  }, [dispatch, navigate])
+const handleLogout = useCallback(() => {
+  // Navigate to home first to unmount the profile page cleanly
+  if (location.pathname === '/profile') {
+    navigate('/', { replace: true });
+    setTimeout(() => {
+      dispatch(logout());
+      navigate('/login', { replace: true });
+    }, 50);
+  } else {
+    dispatch(logout());
+    navigate('/login', { replace: true });
+  }
+}, [dispatch, navigate, location.pathname]);
 
   // Event listeners setup - optimized
   useEffect(() => {
