@@ -30,12 +30,12 @@ export const ImageCarousel = ({ images }) => {
     setTouchEnd(e.targetTouches[0].clientX)
   }
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
     if (touchStart - touchEnd > 100) {
-      handleNext()
+      handleNext(e)
     }
     if (touchEnd - touchStart > 100) {
-      handlePrev()
+      handlePrev(e)
     }
   }
 
@@ -62,8 +62,6 @@ export const ImageCarousel = ({ images }) => {
                 alt={`Image ${index + 1}`}
                 className="ts-carousel-image"
                 loading={index === 0 ? "eager" : "lazy"}
-                width="400"
-                height="300"
               />
             </div>
           ))}

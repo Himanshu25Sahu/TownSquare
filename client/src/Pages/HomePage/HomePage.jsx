@@ -99,7 +99,7 @@ function HomePage() {
 // Fetch paginated posts without type filter
 const response = await api.get(`/post/getFeed?page=${currentPage}&limit=${postsPerPage}`);
 
-
+        console.log("------------------",response)
         if (response.data) {
           setPageData(prev => ({
             ...prev,
@@ -109,6 +109,7 @@ const response = await api.get(`/post/getFeed?page=${currentPage}&limit=${postsP
             county: response.data.county || ""
           }));
           setTotalPosts(response.data.totalPosts || 0); // Set total posts from API response
+          console.log(pageData)
 
           if (!response.data.trending && response.data.posts?.length > 0) {
             const postWithHighestUpvotes = response.data.posts.reduce(

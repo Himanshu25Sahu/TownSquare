@@ -2024,8 +2024,23 @@ button {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+    display: none;
   }
 
+  .survey-card.compact .survey-card-badge{
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+    margin: 0;
+    /* position: absolute;; */
+    display: none;
+  }
+
+  .status-past{
+    display: none;
+  }
+  .status-text{
+    display: none
+  }
   .survey-card-rating {
     padding: 0.8rem;
   }

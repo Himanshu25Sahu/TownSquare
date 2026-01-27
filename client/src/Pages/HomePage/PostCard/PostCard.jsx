@@ -1021,9 +1021,7 @@ export const PostCard = ({ post, navigate }) => {
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
             </span>
-            <div className="action-data">
-              <span className="action-count">{post.commentCount || state.comments.length || 0}</span>
-            </div>
+
           </button>
           <button
             className={`action-button ${state.isBookmarked ? "active" : ""}`}
@@ -1184,10 +1182,6 @@ export const PostCard = ({ post, navigate }) => {
               <div className="survey-card-meta">
                 <span className="survey-card-type">
                   <BarChart3 className="meta-icon" /> {post.type}
-                </span>
-                <span className="survey-card-creator">
-                  <User className="meta-icon" />
-                  <span className="creator-name">{post.createdBy?.username || "Anonymous"}</span>
                 </span>
               </div>
             </div>

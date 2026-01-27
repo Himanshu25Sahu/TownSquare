@@ -308,16 +308,6 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              <div className="form-options login-form-options">
-                <div className="remember-me login-remember-me">
-                  <input type="checkbox" id="remember" />
-                  <label htmlFor="remember">Remember me</label>
-                </div>
-                <a href="#" className="forgot-password login-forgot-password">
-                  Forgot Password?
-                </a>
-              </div>
-
               <button type="submit" className="auth-button login-auth-button" disabled={isSubmitting}>
                 {isSubmitting ? <span className="loading-spinner"></span> : "Sign In"}
               </button>
