@@ -278,7 +278,7 @@ function CreatePost() {
         throw new Error("Poll requires a question and all options must be filled");
       }
       if (!formData.poll.deadline) {
-        throw new Error("Poll deadline is required");
+        throw new Error("Poll Start date is required");
       }
     }
 
@@ -287,7 +287,7 @@ function CreatePost() {
         throw new Error("All survey questions must be filled");
       }
       if (!formData.survey.deadline) {
-        throw new Error("Survey deadline is required");
+        throw new Error("Survey Start date is required");
       }
       formData.survey.questions.forEach(q => {
         if (q.type === "multiple-choice" && q.options.some(opt => !opt.trim())) {
@@ -648,7 +648,7 @@ function CreatePost() {
                     </motion.button>
                     <label>
                       <HiOutlineCalendar className="create-post-input-icon" /> 
-                      Poll Deadline
+                      Poll Start date
                     </label>
                     <DatePicker
                       selected={formData.poll.deadline}
@@ -660,7 +660,7 @@ function CreatePost() {
                       }
                       dateFormat="MMMM d, yyyy"
                       className="create-post-form-control"
-                      placeholderText="Select deadline"
+                      placeholderText="Select Start date"
                       minDate={new Date()}
                       required
                     />
@@ -803,7 +803,7 @@ function CreatePost() {
                     </motion.button>
                     <label>
                       <HiOutlineCalendar className="create-post-input-icon" /> 
-                      Survey Deadline
+                      Survey Start date
                     </label>
                     <DatePicker
                       selected={formData.survey.deadline}
@@ -815,7 +815,7 @@ function CreatePost() {
                       }
                       dateFormat="MMMM d, yyyy"
                       className="create-post-form-control"
-                      placeholderText="Select deadline"
+                      placeholderText="Select Start date"
                       minDate={new Date()}
                       required
                     />
