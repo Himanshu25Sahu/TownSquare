@@ -22,7 +22,6 @@ export const updatePostStatus = async () => {
           post.poll.status = "past";
         } else if (creationDate <= now) {
           post.poll.status = "active";
-  
         } else {
           post.poll.status = "upcoming";
         }

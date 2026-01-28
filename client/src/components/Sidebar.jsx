@@ -173,7 +173,7 @@ const handleLogout = useCallback(() => {
 
       <div
         className={`sidebar ${isCollapsed ? "sidebar-collapsed" : ""} ${isMobileOpen ? "open" : ""}`}
-        data-theme={theme}
+        // data-theme={theme}
       >
         <div className="sidebar-header">
           <Link to="/" className="sidebar-logo">

@@ -141,9 +141,6 @@ function EmergencyPage() {
               ))}
             </div>
           </div>
-          <div className="emergency-card-footer">
-            <button className="emergency-view-button">View Map</button>
-          </div>
         </div>
 
         <div className="emergency-card">
@@ -187,73 +184,8 @@ function EmergencyPage() {
               </ul>
             </div>
           </div>
-          <div className="emergency-card-footer">
-            <button className="emergency-view-button">Download Full Guide</button>
-          </div>
         </div>
 
-        <div className="emergency-card">
-          <div className="emergency-card-header">
-            <h3 className="emergency-card-title">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="emergency-card-icon"
-              >
-                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
-                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
-              </svg>
-              Emergency Alerts
-            </h3>
-          </div>
-          <div className="emergency-card-content">
-            <p className="emergency-alerts-description">
-              Sign up to receive emergency alerts via text message, email, or phone call.
-            </p>
-            <div className="emergency-alert-options">
-              <div className="emergency-alert-option">
-                <input
-                  type="checkbox"
-                  id="text-alerts"
-                  className="emergency-checkbox"
-                />
-                <label htmlFor="text-alerts" className="emergency-checkbox-label">
-                  Text Message Alerts
-                </label>
-              </div>
-              <div className="emergency-alert-option">
-                <input
-                  type="checkbox"
-                  id="email-alerts"
-                  className="emergency-checkbox"
-                />
-                <label htmlFor="email-alerts" className="emergency-checkbox-label">
-                  Email Alerts
-                </label>
-              </div>
-              <div className="emergency-alert-option">
-                <input
-                  type="checkbox"
-                  id="phone-alerts"
-                  className="emergency-checkbox"
-                />
-                <label htmlFor="phone-alerts" className="emergency-checkbox-label">
-                  Phone Call Alerts
-                </label>
-              </div>
-            </div>
-          </div>
-          <div className="emergency-card-footer">
-            <button className="emergency-subscribe-button">Subscribe to Alerts</button>
-          </div>
-        </div>
       </div>
     </div>
   );
