@@ -1,5 +1,3 @@
-
-
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "./ThemeProvider";
@@ -108,8 +106,12 @@ function CreatePost() {
     description: "",
     type: "general",
     important: false,
-    poll: { question: "", options: ["", ""], deadline: null },
-    survey: { questions: [{ question: "", type: "multiple-choice", options: ["", ""] }], deadline: null },
+    poll: { question: "", options: ["", ""], deadline: null, allowMultiple: false },
+    survey: {
+      questions: [{ question: "", type: "multiple-choice", options: ["", ""] }],
+      deadline: null,
+      allowMultiple: false,
+    },
     marketplace: {
       itemType: "sale",
       price: 0,
@@ -182,11 +184,15 @@ function CreatePost() {
   const handleSurveyQuestionChange = (index, field, value) => {
     const newQuestions = [...formData.survey.questions];
     newQuestions[index][field] = value;
-    
-    if (field === "type" && value === "multiple-choice" && (!newQuestions[index].options || newQuestions[index].options.length === 0)) {
+
+    if (
+      field === "type" &&
+      value === "multiple-choice" &&
+      (!newQuestions[index].options || newQuestions[index].options.length === 0)
+    ) {
       newQuestions[index].options = ["", ""];
     }
-    
+
     setFormData({
       ...formData,
       survey: { ...formData.survey, questions: newQuestions },
@@ -274,8 +280,13 @@ function CreatePost() {
     }
 
     if (formData.type === "poll") {
-      if (!formData.poll.question || formData.poll.options.some(opt => !opt.trim())) {
-        throw new Error("Poll requires a question and all options must be filled");
+      if (
+        !formData.poll.question ||
+        formData.poll.options.some((opt) => !opt.trim())
+      ) {
+        throw new Error(
+          "Poll requires a question and all options must be filled",
+        );
       }
       if (!formData.poll.deadline) {
         throw new Error("Poll Start date is required");
@@ -283,14 +294,17 @@ function CreatePost() {
     }
 
     if (formData.type === "survey") {
-      if (formData.survey.questions.some(q => !q.question.trim())) {
+      if (formData.survey.questions.some((q) => !q.question.trim())) {
         throw new Error("All survey questions must be filled");
       }
       if (!formData.survey.deadline) {
         throw new Error("Survey Start date is required");
       }
-      formData.survey.questions.forEach(q => {
-        if (q.type === "multiple-choice" && q.options.some(opt => !opt.trim())) {
+      formData.survey.questions.forEach((q) => {
+        if (
+          q.type === "multiple-choice" &&
+          q.options.some((opt) => !opt.trim())
+        ) {
           throw new Error("All multiple-choice options must be filled");
         }
       });
@@ -298,9 +312,14 @@ function CreatePost() {
 
     if (formData.type === "marketplace") {
       if (!formData.marketplace.itemType || !formData.marketplace.location) {
-        throw new Error("Item type and location are required for marketplace posts");
+        throw new Error(
+          "Item type and location are required for marketplace posts",
+        );
       }
-      if (formData.marketplace.itemType === "sale" && !formData.marketplace.price) {
+      if (
+        formData.marketplace.itemType === "sale" &&
+        !formData.marketplace.price
+      ) {
         throw new Error("Price is required for items listed for sale");
       }
     }
@@ -326,28 +345,38 @@ function CreatePost() {
       postData.append("important", formData.important);
 
       if (formData.type === "poll") {
-        postData.append("poll", JSON.stringify({
-          question: formData.poll.question,
-          options: formData.poll.options,
-          deadline: formData.poll.deadline
-        }));
+        postData.append(
+          "poll",
+          JSON.stringify({
+            question: formData.poll.question,
+            options: formData.poll.options,
+            deadline: formData.poll.deadline,
+            allowMultiple: formData.poll.allowMultiple,
+          }),
+        );
       }
 
       if (formData.type === "survey") {
-        postData.append("survey", JSON.stringify({
-          questions: formData.survey.questions,
-          deadline: formData.survey.deadline
-        }));
+        postData.append(
+          "survey",
+          JSON.stringify({
+            questions: formData.survey.questions,
+            deadline: formData.survey.deadline,
+          }),
+        );
       }
 
       if (formData.type === "marketplace") {
-        postData.append("marketplace", JSON.stringify({
-          itemType: formData.marketplace.itemType,
-          price: formData.marketplace.price,
-          location: formData.marketplace.location,
-          status: formData.marketplace.status,
-          tags: formData.marketplace.tags || [],
-        }));
+        postData.append(
+          "marketplace",
+          JSON.stringify({
+            itemType: formData.marketplace.itemType,
+            price: formData.marketplace.price,
+            location: formData.marketplace.location,
+            status: formData.marketplace.status,
+            tags: formData.marketplace.tags || [],
+          }),
+        );
       }
 
       if (files.length > 0) {
@@ -360,12 +389,16 @@ function CreatePost() {
         throw new Error("User is not authenticated");
       }
 
-      const response = await axios.post(`${import.meta.env.VITE_BACKEND_BASEURL}/post/create`, postData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_BASEURL}/post/create`,
+        postData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       setSuccess("Post created successfully!");
 
@@ -375,8 +408,19 @@ function CreatePost() {
         type: "general",
         important: false,
         poll: { question: "", options: ["", ""], deadline: null },
-        survey: { questions: [{ question: "", type: "multiple-choice", options: ["", ""] }], deadline: null },
-        marketplace: { itemType: "sale", price: 0, location: "", status: "available", tags: [] },
+        survey: {
+          questions: [
+            { question: "", type: "multiple-choice", options: ["", ""] },
+          ],
+          deadline: null,
+        },
+        marketplace: {
+          itemType: "sale",
+          price: 0,
+          location: "",
+          status: "available",
+          tags: [],
+        },
       });
       setFiles([]);
       setActiveTab("general");
@@ -546,7 +590,7 @@ function CreatePost() {
             <form onSubmit={handleSubmit}>
               <motion.div className="create-post-form-group" variants={fadeIn}>
                 <label htmlFor="title">
-                  <HiOutlinePencilAlt className="create-post-input-icon" /> 
+                  <HiOutlinePencilAlt className="create-post-input-icon" />
                   Title
                 </label>
                 <input
@@ -563,7 +607,7 @@ function CreatePost() {
 
               <motion.div className="create-post-form-group" variants={fadeIn}>
                 <label htmlFor="description">
-                  <HiOutlineDocumentText className="create-post-input-icon" /> 
+                  <HiOutlineDocumentText className="create-post-input-icon" />
                   Description
                 </label>
                 <textarea
@@ -589,7 +633,7 @@ function CreatePost() {
                     transition={{ duration: 0.4, ease: [0.6, 0.05, 0.01, 0.9] }}
                   >
                     <label>
-                      <HiOutlineClipboardList className="create-post-input-icon" /> 
+                      <HiOutlineClipboardList className="create-post-input-icon" />
                       Poll Question
                     </label>
                     <input
@@ -646,8 +690,26 @@ function CreatePost() {
                       </motion.div>
                       Add Option
                     </motion.button>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.poll.allowMultiple}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            poll: {
+                              ...prev.poll,
+                              allowMultiple: e.target.checked,
+                            },
+                          }))
+                        }
+                      />
+                      <span>Allow multiple selections</span>
+                      <br />
+                      <br />
+                    </label>
                     <label>
-                      <HiOutlineCalendar className="create-post-input-icon" /> 
+                      <HiOutlineCalendar className="create-post-input-icon" />
                       Poll Start date
                     </label>
                     <DatePicker
@@ -677,7 +739,7 @@ function CreatePost() {
                     transition={{ duration: 0.4, ease: [0.6, 0.05, 0.01, 0.9] }}
                   >
                     <label>
-                      <HiOutlineDocumentText className="create-post-input-icon" /> 
+                      <HiOutlineDocumentText className="create-post-input-icon" />
                       Survey Questions
                     </label>
                     {formData.survey.questions.map((question, index) => (
@@ -695,7 +757,7 @@ function CreatePost() {
                             handleSurveyQuestionChange(
                               index,
                               "question",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder={`Question ${index + 1}`}
@@ -708,7 +770,7 @@ function CreatePost() {
                             handleSurveyQuestionChange(
                               index,
                               "type",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           className="create-post-form-control"
@@ -738,7 +800,7 @@ function CreatePost() {
                                     handleSurveyOptionChange(
                                       index,
                                       optIndex,
-                                      e.target.value
+                                      e.target.value,
                                     )
                                   }
                                   placeholder={`Option ${optIndex + 1}`}
@@ -749,7 +811,9 @@ function CreatePost() {
                                   <motion.button
                                     type="button"
                                     className="create-post-remove-option-btn"
-                                    onClick={() => removeSurveyOption(index, optIndex)}
+                                    onClick={() =>
+                                      removeSurveyOption(index, optIndex)
+                                    }
                                     whileHover={{ scale: 1.1, rotate: 90 }}
                                     whileTap={{ scale: 0.9 }}
                                   >
@@ -802,7 +866,7 @@ function CreatePost() {
                       Add Question
                     </motion.button>
                     <label>
-                      <HiOutlineCalendar className="create-post-input-icon" /> 
+                      <HiOutlineCalendar className="create-post-input-icon" />
                       Survey Start date
                     </label>
                     <DatePicker
@@ -833,7 +897,7 @@ function CreatePost() {
                   >
                     <div className="create-post-form-group">
                       <label htmlFor="important">
-                        <HiOutlineExclamationCircle className="create-post-input-icon" /> 
+                        <HiOutlineExclamationCircle className="create-post-input-icon" />
                         Important Announcement
                       </label>
                       <input
@@ -878,7 +942,7 @@ function CreatePost() {
                     {formData.marketplace.itemType === "sale" && (
                       <div className="create-post-form-group">
                         <label htmlFor="price">
-                          <HiOutlineCurrencyDollar className="create-post-input-icon" /> 
+                          <HiOutlineCurrencyDollar className="create-post-input-icon" />
                           Price
                         </label>
                         <input
@@ -897,7 +961,7 @@ function CreatePost() {
 
                     <div className="create-post-form-group">
                       <label htmlFor="location">
-                        <HiOutlineLocationMarker className="create-post-input-icon" /> 
+                        <HiOutlineLocationMarker className="create-post-input-icon" />
                         Location
                       </label>
                       <input
@@ -914,7 +978,7 @@ function CreatePost() {
 
                     <div className="create-post-form-group">
                       <label htmlFor="status">
-                        <HiOutlineTag className="create-post-input-icon" /> 
+                        <HiOutlineTag className="create-post-input-icon" />
                         Status
                       </label>
                       <select
@@ -962,7 +1026,7 @@ function CreatePost() {
 
               <motion.div className="create-post-form-group" variants={fadeIn}>
                 <label htmlFor="attachments">
-                  <HiOutlinePaperClip className="create-post-input-icon" /> 
+                  <HiOutlinePaperClip className="create-post-input-icon" />
                   Attachments
                 </label>
                 <div className="create-post-file-upload-container">
@@ -987,7 +1051,7 @@ function CreatePost() {
                     />
                   </motion.label>
                   <span className="create-post-file-help-text">
-                    Upload images or documents (optional) - {uploadsRemaining} 
+                    Upload images or documents (optional) - {uploadsRemaining}
                     uploads remaining
                   </span>
                 </div>

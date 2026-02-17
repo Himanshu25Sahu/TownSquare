@@ -1,5 +1,3 @@
-
-
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -23,6 +21,8 @@ const PostPage = () => {
   const [upVotes, setUpVotes] = useState(0);
   const [downVotes, setDownVotes] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedPollOptions, setSelectedPollOptions] = useState([]);
+  const [isMultiSelectPoll, setIsMultiSelectPoll] = useState(false);
   const { isDarkMode } = useTheme();
 
   // Image carousel state
@@ -52,7 +52,7 @@ const PostPage = () => {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         if (response.data.success) {
@@ -61,14 +61,14 @@ const PostPage = () => {
           setDownVotes(response.data.post.downVotes || 0);
 
           const votedPosts = JSON.parse(
-            localStorage.getItem("votedPosts") || "{}"
+            localStorage.getItem("votedPosts") || "{}",
           );
           if (votedPosts[id]) {
             setUserVote(votedPosts[id]);
           }
 
           const bookmarkedPosts = JSON.parse(
-            localStorage.getItem("bookmarkedPosts") || "[]"
+            localStorage.getItem("bookmarkedPosts") || "[]",
           );
           setIsBookmarked(bookmarkedPosts.includes(id));
 
@@ -78,7 +78,7 @@ const PostPage = () => {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (commentsResponse.data.success) {
@@ -86,13 +86,21 @@ const PostPage = () => {
           }
 
           if (response.data.post.poll) {
-            const hasVoted = response.data.post.poll.options.some(
-              (option) => option.voters && option.voters.includes(userData?._id)
-            );
-            setHasVoted(hasVoted);
+            const pollData = response.data.post.poll;
 
-            if (hasVoted) {
-              setPollResults(response.data.post.poll);
+            setIsMultiSelectPoll(pollData.allowMultiple || false);
+
+            const hasUserVoted = pollData.options.some((option) =>
+              option.votedBy?.some(
+                (vote) =>
+                  vote?.userId?.toString() === userData?._id?.toString(),
+              ),
+            );
+
+            setHasVoted(hasUserVoted);
+
+            if (hasUserVoted) {
+              setPollResults(pollData);
             }
           }
         } else {
@@ -129,7 +137,7 @@ const PostPage = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -140,7 +148,7 @@ const PostPage = () => {
         setUserVote(newVote);
 
         const votedPosts = JSON.parse(
-          localStorage.getItem("votedPosts") || "{}"
+          localStorage.getItem("votedPosts") || "{}",
         );
         votedPosts[id] = newVote;
         localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
@@ -176,7 +184,7 @@ const PostPage = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -187,7 +195,7 @@ const PostPage = () => {
         setUserVote(newVote);
 
         const votedPosts = JSON.parse(
-          localStorage.getItem("votedPosts") || "{}"
+          localStorage.getItem("votedPosts") || "{}",
         );
         votedPosts[id] = newVote;
         localStorage.setItem("votedPosts", JSON.stringify(votedPosts));
@@ -206,12 +214,12 @@ const PostPage = () => {
     }
 
     const bookmarkedPosts = JSON.parse(
-      localStorage.getItem("bookmarkedPosts") || "[]"
+      localStorage.getItem("bookmarkedPosts") || "[]",
     );
 
     if (isBookmarked) {
       const updatedBookmarks = bookmarkedPosts.filter(
-        (postId) => postId !== id
+        (postId) => postId !== id,
       );
       localStorage.setItem("bookmarkedPosts", JSON.stringify(updatedBookmarks));
     } else {
@@ -221,7 +229,7 @@ const PostPage = () => {
 
     setIsBookmarked(!isBookmarked);
     toast.success(
-      isBookmarked ? "Removed from bookmarks" : "Added to bookmarks"
+      isBookmarked ? "Removed from bookmarks" : "Added to bookmarks",
     );
   };
 
@@ -248,7 +256,7 @@ const PostPage = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -259,7 +267,7 @@ const PostPage = () => {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         if (commentsResponse.data.success) {
@@ -276,8 +284,13 @@ const PostPage = () => {
   };
 
   const handlePollVote = async () => {
-    if (selectedOption === null || !token || !post?.poll || !userData?._id) {
-      toast.error("Please select an option to vote");
+    if (
+      selectedPollOptions.length === 0 ||
+      !token ||
+      !post?.poll ||
+      !userData?._id
+    ) {
+      toast.error("Please select at least one option");
       return;
     }
 
@@ -287,23 +300,19 @@ const PostPage = () => {
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_BASEURL}/post/${id}/vote`,
         {
-          option: post.poll.options[selectedOption]._id,
+          options: selectedPollOptions, // ← array now
           userId: userData._id,
         },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (response.data.success) {
         setHasVoted(true);
-        setPollResults(response.data.updatedPost?.poll);
+        setPollResults(response.data.poll); // ← now has correct vote count
+        setSelectedPollOptions([]);
         toast.success("Your vote has been recorded!");
       }
     } catch (error) {
-      console.error("Error voting in poll:", error);
       toast.error(error.response?.data?.message || "Error voting in poll");
     } finally {
       setIsSubmittingVote(false);
@@ -313,13 +322,13 @@ const PostPage = () => {
   // Image carousel handlers
   const nextImage = () => {
     setCurrentImageIndex((prevIndex) =>
-      prevIndex === post.attachments.length - 1 ? 0 : prevIndex + 1
+      prevIndex === post.attachments.length - 1 ? 0 : prevIndex + 1,
     );
   };
 
   const prevImage = () => {
     setCurrentImageIndex((prevIndex) =>
-      prevIndex === 0 ? post.attachments.length - 1 : prevIndex - 1
+      prevIndex === 0 ? post.attachments.length - 1 : prevIndex - 1,
     );
   };
 
@@ -396,12 +405,11 @@ const PostPage = () => {
     );
   }
 
-  const totalPollVotes =
-    post.poll?.options.reduce((sum, option) => sum + (option.votes || 0), 0) ||
-    0;
+const displayPoll = pollResults || post.poll;
+const totalPollVotes = displayPoll?.options.reduce((sum, option) => sum + (option.votes || 0), 0) || 0;
   const imageAttachments =
     post.attachments?.filter((attachment) =>
-      attachment.fileType?.startsWith("image/")
+      attachment.fileType?.startsWith("image/"),
     ) || [];
 
   return (
@@ -512,9 +520,7 @@ const PostPage = () => {
                   <h3 className="xai-post-poll-title">{post.poll.question}</h3>
                   <div className="xai-post-poll-meta">
                     <span
-                      className={`xai-post-poll-status ${
-                        post.poll.status === "active" ? "active" : ""
-                      }`}
+                      className={`xai-post-poll-status ${post.poll.status === "active" ? "active" : ""}`}
                     >
                       {post.poll.status === "active"
                         ? "Active Poll"
@@ -527,9 +533,10 @@ const PostPage = () => {
                   </div>
                 </div>
 
+                {/* Use displayPoll for correct vote counts after voting */}
                 {hasVoted || post.poll.status !== "active" ? (
                   <div className="xai-post-poll-results">
-                    {post.poll.options.map((option, index) => {
+                    {(pollResults || post.poll).options.map((option, index) => {
                       const percentage =
                         totalPollVotes > 0
                           ? Math.round((option.votes / totalPollVotes) * 100)
@@ -563,53 +570,102 @@ const PostPage = () => {
                   </div>
                 ) : (
                   <div className="xai-post-poll-options">
-                    {post.poll.options.map((option, index) => (
-                      <div
-                        key={option._id}
-                        className={`xai-post-poll-option ${
-                          selectedOption === index ? "selected" : ""
-                        }`}
-                        onClick={() => setSelectedOption(index)}
-                      >
-                        <div className="xai-post-poll-radio-container">
-                          <input
-                            type="radio"
-                            id={`poll-option-${option._id}`}
-                            name="poll-options"
-                            checked={selectedOption === index}
-                            onChange={() => setSelectedOption(index)}
-                            className="xai-post-poll-radio"
-                          />
-                          <span className="xai-post-poll-radio-checkmark"></span>
-                        </div>
-                        <label
-                          htmlFor={`poll-option-${option._id}`}
-                          className="xai-post-poll-option-label"
-                        >
-                          {option.text}
-                        </label>
-                      </div>
-                    ))}
+                    {/* Voting options - FIXED FOR MULTI-SELECT */}
+{hasVoted || post.poll.status !== "active" ? (
+  <div className="xai-post-poll-results">
+    {displayPoll.options.map((option, index) => {
+      const percentage =
+        totalPollVotes > 0
+          ? Math.round((option.votes / totalPollVotes) * 100)
+          : 0;
+      const colorClass = `xai-post-poll-color-${index % 4}`;
 
-                    <button
-                      className={`xai-post-poll-submit ${
-                        selectedOption === null ? "disabled" : ""
-                      }`}
-                      disabled={selectedOption === null || isSubmittingVote}
-                      onClick={handlePollVote}
-                    >
-                      {isSubmittingVote ? (
-                        <>
-                          <span className="xai-post-poll-submit-spinner"></span>
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <Vote className="xai-post-poll-submit-icon" />
-                          Submit Vote
-                        </>
-                      )}
-                    </button>
+      return (
+        <div key={option._id} className="xai-post-poll-result">
+          <div className="xai-post-poll-result-header">
+            <span className="xai-post-poll-result-label">{option.text}</span>
+            <span className={`xai-post-poll-result-percentage ${colorClass}`}>
+              {percentage}%
+            </span>
+          </div>
+          <div className="xai-post-poll-result-bar">
+            <div
+              className={`xai-post-poll-result-progress ${colorClass}`}
+              style={{ width: `${percentage}%` }}
+            ></div>
+          </div>
+          <div className="xai-post-poll-result-votes">
+            <span>{option.votes || 0} votes</span>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+) : (
+  <div className="xai-post-poll-options">
+    {post.poll.options.map((option) => {
+      const optionId = option._id; // safe string comparison
+      const isSelected = selectedPollOptions.includes(optionId);
+
+      return (
+        <label
+          key={optionId}
+          htmlFor={`poll-${optionId}`}
+          className={`xai-post-poll-option ${isSelected ? "selected" : ""}`}
+        >
+          <div className="xai-post-poll-radio-container">
+            {isMultiSelectPoll ? (
+              <input
+                type="checkbox"
+                id={`poll-${optionId}`}
+                checked={isSelected}
+                onChange={() => {
+                  setSelectedPollOptions((prev) =>
+                    isSelected
+                      ? prev.filter((id) => id !== optionId)
+                      : [...prev, optionId]
+                  );
+                }}
+                className="xai-post-poll-radio"
+              />
+            ) : (
+              <input
+                type="radio"
+                id={`poll-${optionId}`}
+                name="poll-options"
+                checked={selectedPollOptions[0] === optionId}
+                onChange={() => setSelectedPollOptions([optionId])}
+                className="xai-post-poll-radio"
+              />
+            )}
+            <span className="xai-post-poll-radio-checkmark"></span>
+          </div>
+          <span className="xai-post-poll-option-label">{option.text}</span>
+        </label>
+      );
+    })}
+
+    <button
+      className={`xai-post-poll-submit ${
+        selectedPollOptions.length === 0 ? "disabled" : ""
+      }`}
+      disabled={selectedPollOptions.length === 0 || isSubmittingVote}
+      onClick={handlePollVote}
+    >
+      {isSubmittingVote ? (
+        <>Submitting...</>
+      ) : (
+        <>
+          <Vote className="xai-post-poll-submit-icon" />
+          Submit Vote{" "}
+          {selectedPollOptions.length > 1
+            ? `(${selectedPollOptions.length})`
+            : ""}
+        </>
+      )}
+    </button>
+  </div>
+)}
                   </div>
                 )}
               </div>

@@ -77,6 +77,10 @@ const postSchema = new mongoose.Schema(
         enum: ["active", "upcoming", "past"],
         default: "active",
       }, // Status of the poll
+      allowMultiple: {
+        type: Boolean,
+        default: false,
+      },
     },
     // Fields for surveys
     survey: {
@@ -160,14 +164,14 @@ const postSchema = new mongoose.Schema(
             userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
             message: { type: String, required: true },
             createdAt: { type: Date, default: Date.now },
-            isRead: { type: Boolean, default: false } // Add this field
-          }
+            isRead: { type: Boolean, default: false }, // Add this field
+          },
         ],
       },
       required: false, // ← This is the key change
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Middleware to dynamically calculate the "past" status based on the deadline

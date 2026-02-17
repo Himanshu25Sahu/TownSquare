@@ -8,7 +8,7 @@ import ErrorHandler from "../utils/errorHandler.js";
 import mongoose from "mongoose";
 import { User } from "../models/userModel.js";
 import { redis } from "../app.js";
-import { gzip,gunzip } from "zlib";
+import { gzip, gunzip } from "zlib";
 import { promisify } from "util";
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -111,6 +111,7 @@ export const createPost = async (req, res) => {
           })),
           deadline: surveyDeadline,
           status: surveyDeadline > new Date() ? "upcoming" : "active",
+          allowMultiple: parsedPoll.allowMultiple ?? false,
         };
         break;
 
@@ -166,7 +167,7 @@ export const createPost = async (req, res) => {
             fileType: file.mimetype,
             publicId: uploaded.public_id,
           };
-        })
+        }),
       );
     }
 
@@ -208,12 +209,19 @@ export const getCountyPosts = async (req, res) => {
     const limitNum = Math.min(parseInt(limit, 10), 20); // Cap limit for performance
 
     if (isNaN(pageNum) || pageNum < 1 || isNaN(limitNum) || limitNum < 1) {
-      return res.status(400).json({ success: false, message: "Invalid page or limit" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid page or limit" });
     }
 
-    const user = await User.findById(requestingUserId, "location.county").lean();
+    const user = await User.findById(
+      requestingUserId,
+      "location.county",
+    ).lean();
     if (!user || !user.location?.county) {
-      return res.status(400).json({ success: false, message: "User or county not found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User or county not found" });
     }
     const userCounty = user.location.county;
 
@@ -227,8 +235,12 @@ export const getCountyPosts = async (req, res) => {
       if (rawData) {
         const decompressStartTime = performance.now();
         cachedData = JSON.parse(await gunzipAsync(Buffer.from(rawData)));
-        console.log(`Redis lookup time: ${(redisEndTime - redisStartTime).toFixed(2)}ms`);
-        console.log(`Decompression time: ${(performance.now() - decompressStartTime).toFixed(2)}ms`);
+        console.log(
+          `Redis lookup time: ${(redisEndTime - redisStartTime).toFixed(2)}ms`,
+        );
+        console.log(
+          `Decompression time: ${(performance.now() - decompressStartTime).toFixed(2)}ms`,
+        );
       }
     } catch (redisError) {
       console.error("Redis error:", redisError.message);
@@ -236,8 +248,12 @@ export const getCountyPosts = async (req, res) => {
     const cacheEndTime = performance.now();
 
     if (cachedData) {
-      console.log(`Cache hit for key: ${cacheKey}, Total cache time: ${(cacheEndTime - redisStartTime).toFixed(2)}ms`);
-      console.log(`Total request time (cache hit): ${(performance.now() - startTime).toFixed(2)}ms`);
+      console.log(
+        `Cache hit for key: ${cacheKey}, Total cache time: ${(cacheEndTime - redisStartTime).toFixed(2)}ms`,
+      );
+      console.log(
+        `Total request time (cache hit): ${(performance.now() - startTime).toFixed(2)}ms`,
+      );
       return res.status(200).json(cachedData);
     }
 
@@ -245,14 +261,26 @@ export const getCountyPosts = async (req, res) => {
     const dbStartTime = performance.now();
 
     // Pre-fetch user IDs for optimization
-    const countyUserIds = await User.find({ "location.county": userCounty }, "_id").lean();
-    const userIds = countyUserIds.map(user => user._id);
+    const countyUserIds = await User.find(
+      { "location.county": userCounty },
+      "_id",
+    ).lean();
+    const userIds = countyUserIds.map((user) => user._id);
 
     const posts = await Post.aggregate([
       {
         $match: {
           createdBy: { $in: userIds },
-          type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
+          type: {
+            $in: [
+              "announcements",
+              "poll",
+              "survey",
+              "general",
+              "marketplace",
+              "issue",
+            ],
+          },
         },
       },
       {
@@ -272,7 +300,12 @@ export const getCountyPosts = async (req, res) => {
               initialValue: null,
               in: {
                 $cond: [
-                  { $eq: ["$$this.userId", new mongoose.Types.ObjectId(requestingUserId)] },
+                  {
+                    $eq: [
+                      "$$this.userId",
+                      new mongoose.Types.ObjectId(requestingUserId),
+                    ],
+                  },
                   "$$this.voteType",
                   "$$value",
                 ],
@@ -312,7 +345,16 @@ export const getCountyPosts = async (req, res) => {
 
     const totalPosts = await Post.countDocuments({
       createdBy: { $in: userIds },
-      type: { $in: ["announcements", "poll", "survey", "general", "marketplace", "issue"] },
+      type: {
+        $in: [
+          "announcements",
+          "poll",
+          "survey",
+          "general",
+          "marketplace",
+          "issue",
+        ],
+      },
     });
 
     const formattedPosts = posts.map((post) => ({
@@ -335,7 +377,9 @@ export const getCountyPosts = async (req, res) => {
       .lean();
 
     const dbEndTime = performance.now();
-    console.log(`Database query time: ${(dbEndTime - dbStartTime).toFixed(2)}ms`);
+    console.log(
+      `Database query time: ${(dbEndTime - dbStartTime).toFixed(2)}ms`,
+    );
 
     const response = {
       success: true,
@@ -348,7 +392,7 @@ export const getCountyPosts = async (req, res) => {
     try {
       const cacheResponse = {
         success: response.success,
-        posts: response.posts.map(post => ({
+        posts: response.posts.map((post) => ({
           _id: post._id,
           title: post.title,
           description: post.description,
@@ -371,13 +415,17 @@ export const getCountyPosts = async (req, res) => {
       };
       const compressStartTime = performance.now();
       const compressedData = await gzipAsync(JSON.stringify(cacheResponse));
-      console.log(`Compression time: ${(performance.now() - compressStartTime).toFixed(2)}ms`);
+      console.log(
+        `Compression time: ${(performance.now() - compressStartTime).toFixed(2)}ms`,
+      );
       await redis.set(cacheKey, compressedData, { ex: 120 });
     } catch (redisError) {
       console.error("Failed to set cache:", redisError.message);
     }
 
-    console.log(`Total request time (cache miss): ${(performance.now() - startTime).toFixed(2)}ms`);
+    console.log(
+      `Total request time (cache miss): ${(performance.now() - startTime).toFixed(2)}ms`,
+    );
     res.status(200).json(response);
   } catch (error) {
     console.error("Error in getCountyPosts:", error.message);
@@ -489,41 +537,84 @@ export const submitVote = async (req, res) => {
     }
 
     // Handle poll voting logic
+    // Handle poll voting logic
     if (post.type === "poll") {
-      // Check if user has already voted in ANY option of this poll
-      const hasUserVotedInPoll = post.poll.options.some((opt) =>
-        opt.votedBy?.some(
-          (vote) => vote && vote.userId && vote.userId.toString() === userId
-        )
-      );
+      const selectedOptions = Array.isArray(req.body.options)
+        ? req.body.options
+        : req.body.option
+          ? [req.body.option]
+          : [];
 
-      if (hasUserVotedInPoll) {
+      if (selectedOptions.length === 0) {
         return res.status(400).json({
           success: false,
-          message: "You have already voted in this poll",
+          message: "At least one option is required",
         });
       }
 
-      // Find the selected option
-      const pollOption = post.poll.options.find(
-        (opt) => opt._id.toString() === option
-      );
+      const allowMultiple = post.poll.allowMultiple || false;
 
-      if (!pollOption) {
+      if (!allowMultiple && selectedOptions.length > 1) {
         return res.status(400).json({
           success: false,
-          message: "Invalid option",
+          message: "This poll allows only one selection",
         });
       }
 
-      // Initialize votedBy array if it doesn't exist
-      if (!pollOption.votedBy || !Array.isArray(pollOption.votedBy)) {
-        pollOption.votedBy = [];
+      const userObjectId = new mongoose.Types.ObjectId(userId);
+
+      // For single-select: prevent voting again
+      if (!allowMultiple) {
+        const hasVotedInPoll = post.poll.options.some((opt) =>
+          opt.votedBy?.some((vote) => vote?.userId?.toString() === userId),
+        );
+        if (hasVotedInPoll) {
+          return res.status(400).json({
+            success: false,
+            message: "You have already voted in this poll",
+          });
+        }
       }
 
-      // Increment the vote count and add the user to votedBy
-      pollOption.votes += 1;
-      pollOption.votedBy.push({ userId });
+      // Process each selected option
+      for (const optionId of selectedOptions) {
+        const pollOption = post.poll.options.find(
+          (opt) => opt._id.toString() === optionId,
+        );
+
+        if (!pollOption) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid option",
+          });
+        }
+
+        // Prevent duplicate vote on same option (even in multi-select)
+        const alreadyVotedThis = pollOption.votedBy?.some(
+          (vote) => vote?.userId?.toString() === userId,
+        );
+        if (alreadyVotedThis) {
+          return res.status(400).json({
+            success: false,
+            message: `You already voted for "${pollOption.text}"`,
+          });
+        }
+
+        if (!pollOption.votedBy || !Array.isArray(pollOption.votedBy)) {
+          pollOption.votedBy = [];
+        }
+
+        pollOption.votes += 1;
+        pollOption.votedBy.push({ userId: userObjectId });
+      }
+
+      await post.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Vote submitted successfully",
+        poll: post.poll, // ← This fixes the 0 votes bug
+      });
     } else if (post.type === "survey") {
       const surveyQuestion = post.survey.questions[0]; // Assuming there's only one question for simplicity
 
@@ -548,7 +639,7 @@ export const submitVote = async (req, res) => {
 
           // Check if the user has already voted for this question
           const hasUserVoted = surveyQuestion.votes.some(
-            (vote) => vote && vote.userId && vote.userId.toString() === userId
+            (vote) => vote && vote.userId && vote.userId.toString() === userId,
           );
 
           if (hasUserVoted) {
@@ -566,7 +657,7 @@ export const submitVote = async (req, res) => {
         } else {
           // If options is an array of objects, treat option as an _id
           const surveyOption = surveyQuestion.options.find(
-            (opt) => opt._id.toString() === option
+            (opt) => opt._id.toString() === option,
           );
 
           if (!surveyOption) {
@@ -578,7 +669,7 @@ export const submitVote = async (req, res) => {
 
           // Check if the user has already voted for this question
           const hasUserVoted = surveyQuestion.votes.some(
-            (vote) => vote && vote.userId && vote.userId.toString() === userId
+            (vote) => vote && vote.userId && vote.userId.toString() === userId,
           );
 
           if (hasUserVoted) {
@@ -605,7 +696,7 @@ export const submitVote = async (req, res) => {
 
         // Check if the user has already responded to this question
         const hasUserResponded = surveyQuestion.responses.some(
-          (resp) => resp && resp.userId && resp.userId.toString() === userId
+          (resp) => resp && resp.userId && resp.userId.toString() === userId,
         );
 
         if (hasUserResponded) {
@@ -631,7 +722,7 @@ export const submitVote = async (req, res) => {
 
         // Check if the user has already rated this question
         const hasUserRated = surveyQuestion.ratings.some(
-          (rate) => rate && rate.userId && rate.userId.toString() === userId
+          (rate) => rate && rate.userId && rate.userId.toString() === userId,
         );
 
         if (hasUserRated) {
@@ -714,7 +805,7 @@ export const viewResults = async (req, res) => {
         })),
         totalVotes: post.poll.options.reduce(
           (acc, option) => acc + option.votes,
-          0
+          0,
         ),
       };
     }
@@ -734,7 +825,7 @@ export const viewResults = async (req, res) => {
               questionResult.options = await Promise.all(
                 question.options.map(async (option, index) => {
                   const votes = question.votes.filter(
-                    (vote) => vote.optionIndex === index
+                    (vote) => vote.optionIndex === index,
                   );
                   const votedByUsers = await Promise.all(
                     votes.map(async (vote) => {
@@ -742,7 +833,7 @@ export const viewResults = async (req, res) => {
                         username: 1,
                       }).exec();
                       return user ? user.username : "Unknown User";
-                    })
+                    }),
                   );
 
                   return {
@@ -750,7 +841,7 @@ export const viewResults = async (req, res) => {
                     votes: votes.length,
                     votedBy: votedByUsers,
                   };
-                })
+                }),
               );
               questionResult.totalVotes = question.votes.length;
             }
@@ -767,7 +858,7 @@ export const viewResults = async (req, res) => {
                     userId: response.userId,
                     username: user ? user.username : "Unknown User",
                   };
-                })
+                }),
               );
               questionResult.totalResponses = question.responses.length;
             }
@@ -779,7 +870,7 @@ export const viewResults = async (req, res) => {
                 totalRatings > 0
                   ? question.ratings.reduce(
                       (acc, rating) => acc + rating.rating,
-                      0
+                      0,
                     ) / totalRatings
                   : 0;
 
@@ -793,14 +884,14 @@ export const viewResults = async (req, res) => {
                     userId: rating.userId,
                     username: user ? user.username : "Unknown User",
                   };
-                })
+                }),
               );
               questionResult.averageRating = averageRating;
               questionResult.totalRatings = totalRatings;
             }
 
             return questionResult;
-          })
+          }),
         ),
         totalQuestions: post.survey.questions.length,
       };
@@ -1027,7 +1118,7 @@ export const getPostById = async (req, res) => {
     const { postId } = req.params;
     const post = await Post.findById(postId).populate(
       "createdBy",
-      "name email avatar username"
+      "name email avatar username",
     );
 
     if (!post) {
@@ -1067,7 +1158,7 @@ export const upvotePost = async (req, res) => {
 
     // Check if the user has already voted
     const existingVoteIndex = post.votedUsers.findIndex(
-      (vote) => vote.userId.toString() === userId.toString()
+      (vote) => vote.userId.toString() === userId.toString(),
     );
 
     if (existingVoteIndex !== -1) {
@@ -1127,7 +1218,7 @@ export const downvotePost = async (req, res) => {
 
     // Check if the user has already voted
     const existingVoteIndex = post.votedUsers.findIndex(
-      (vote) => vote.userId.toString() === userId.toString()
+      (vote) => vote.userId.toString() === userId.toString(),
     );
 
     if (existingVoteIndex !== -1) {
@@ -1187,7 +1278,7 @@ export const removeVote = async (req, res) => {
 
     // Check if the user has voted
     const existingVoteIndex = post.votedUsers.findIndex(
-      (vote) => vote.userId.toString() === userId.toString()
+      (vote) => vote.userId.toString() === userId.toString(),
     );
 
     if (existingVoteIndex === -1) {
@@ -1266,7 +1357,7 @@ export const addComment = async (req, res) => {
     const updatedPost = await Post.findByIdAndUpdate(
       postId,
       { $addToSet: { comments: comment._id } },
-      { new: true }
+      { new: true },
     ).populate("comments");
 
     res.status(201).json({
@@ -1429,34 +1520,34 @@ export const getMarketplaceMessages = async (req, res) => {
     const postsWithMessages = await Post.find({
       type: "marketplace",
       "marketplace.seller": sellerId,
-      "marketplace.contactMessages.0": { $exists: true }
+      "marketplace.contactMessages.0": { $exists: true },
     })
-    .populate({
-      path: "marketplace.contactMessages.userId",
-      select: "username email avatar"
-    })
-    .sort({ "marketplace.contactMessages.createdAt": -1 });
+      .populate({
+        path: "marketplace.contactMessages.userId",
+        select: "username email avatar",
+      })
+      .sort({ "marketplace.contactMessages.createdAt": -1 });
 
     if (!postsWithMessages || postsWithMessages.length === 0) {
       return res.status(200).json({
         success: true,
         message: "No marketplace messages found",
-        messages: []
+        messages: [],
       });
     }
 
     // Format the response to include all messages (both read and unread)
-    const formattedMessages = postsWithMessages.flatMap(post => {
-      return post.marketplace.contactMessages.map(message => ({
+    const formattedMessages = postsWithMessages.flatMap((post) => {
+      return post.marketplace.contactMessages.map((message) => ({
         postId: post._id,
         postTitle: post.title,
         postDescription: post.description,
         postPrice: post.marketplace.price,
         postLocation: post.marketplace.location,
         postStatus: post.marketplace.status,
-        postAttachments: post.attachments.map(attachment => ({
+        postAttachments: post.attachments.map((attachment) => ({
           url: attachment.url,
-          fileType: attachment.fileType
+          fileType: attachment.fileType,
         })),
         messageId: message._id,
         message: message.message,
@@ -1466,8 +1557,8 @@ export const getMarketplaceMessages = async (req, res) => {
           userId: message.userId._id,
           username: message.userId.username,
           email: message.userId.email,
-          avatar: message.userId.avatar
-        }
+          avatar: message.userId.avatar,
+        },
       }));
     });
 
@@ -1475,15 +1566,14 @@ export const getMarketplaceMessages = async (req, res) => {
       success: true,
       message: "Marketplace messages retrieved successfully",
       messages: formattedMessages,
-      totalMessages: formattedMessages.length
+      totalMessages: formattedMessages.length,
     });
-
   } catch (error) {
     console.error("Error fetching marketplace messages:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching marketplace messages",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1498,13 +1588,13 @@ export const markMessageAsRead = async (req, res) => {
     const post = await Post.findOne({
       _id: postId,
       type: "marketplace",
-      "marketplace.seller": sellerId
+      "marketplace.seller": sellerId,
     });
 
     if (!post) {
       return res.status(404).json({
         success: false,
-        message: "Post not found or you are not the seller"
+        message: "Post not found or you are not the seller",
       });
     }
 
@@ -1513,7 +1603,7 @@ export const markMessageAsRead = async (req, res) => {
     if (!message) {
       return res.status(404).json({
         success: false,
-        message: "Message not found"
+        message: "Message not found",
       });
     }
 
@@ -1523,21 +1613,20 @@ export const markMessageAsRead = async (req, res) => {
     // Return the updated message
     const updatedMessage = {
       messageId: message._id,
-      isRead: message.isRead
+      isRead: message.isRead,
     };
 
     res.status(200).json({
       success: true,
       message: "Message marked as read",
-      updatedMessage
+      updatedMessage,
     });
-
   } catch (error) {
     console.error("Error marking message as read:", error);
     res.status(500).json({
       success: false,
       message: "Error marking message as read",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1552,33 +1641,34 @@ export const getPostMessages = async (req, res) => {
     const post = await Post.findOne({
       _id: postId,
       type: "marketplace",
-      "marketplace.seller": sellerId
-    })
-    .populate({
+      "marketplace.seller": sellerId,
+    }).populate({
       path: "marketplace.contactMessages.userId",
-      select: "username email avatar" // User details of message senders
+      select: "username email avatar", // User details of message senders
     });
 
     if (!post) {
       return res.status(404).json({
         success: false,
-        message: "Post not found or you are not the seller"
+        message: "Post not found or you are not the seller",
       });
     }
 
     // Format the messages
-    const formattedMessages = post.marketplace.contactMessages.map(message => ({
-      messageId: message._id,
-      message: message.message,
-      createdAt: message.createdAt,
-      isRead: message.isRead || false,
-      sender: {
-        userId: message.userId._id,
-        username: message.userId.username,
-        email: message.userId.email,
-        avatar: message.userId.avatar
-      }
-    }));
+    const formattedMessages = post.marketplace.contactMessages.map(
+      (message) => ({
+        messageId: message._id,
+        message: message.message,
+        createdAt: message.createdAt,
+        isRead: message.isRead || false,
+        sender: {
+          userId: message.userId._id,
+          username: message.userId.username,
+          email: message.userId.email,
+          avatar: message.userId.avatar,
+        },
+      }),
+    );
 
     res.status(200).json({
       success: true,
@@ -1590,21 +1680,20 @@ export const getPostMessages = async (req, res) => {
         price: post.marketplace.price,
         location: post.marketplace.location,
         status: post.marketplace.status,
-        attachments: post.attachments.map(attachment => ({
+        attachments: post.attachments.map((attachment) => ({
           url: attachment.url,
-          fileType: attachment.fileType
-        }))
+          fileType: attachment.fileType,
+        })),
       },
       messages: formattedMessages,
-      totalMessages: formattedMessages.length
+      totalMessages: formattedMessages.length,
     });
-
   } catch (error) {
     console.error("Error fetching post messages:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching post messages",
-      error: error.message
+      error: error.message,
     });
   }
 };

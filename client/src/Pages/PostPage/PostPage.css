@@ -945,7 +945,18 @@
   width: 18px;
   height: 18px;
 }
+.xai-post-poll-option input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #3b82f6; /* or your theme color */
+  cursor: pointer;
+}
 
+/* Make whole row clickable */
+.xai-post-poll-option {
+  cursor: pointer;
+  user-select: none;
+}
 .xai-post-poll-submit-spinner {
   width: 18px;
   height: 18px;
